@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interactive SLAM Visualized</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="bg-orb orb-a"></div>
+    <div class="bg-orb orb-b"></div>
+
+    <main>
+      <header class="hero">
+        <p class="eyebrow">Robotics Visualization Lab</p>
+        <h1>SLAM, Explained Like a Living System</h1>
+        <p class="lede">
+          Simultaneous Localization and Mapping (SLAM) lets a robot answer two questions at once:
+          <strong>Where am I?</strong> and <strong>What does the world look like?</strong>.
+          The demos below show how drift appears, how landmarks correct it, and how a map emerges over time.
+        </p>
+      </header>
+
+      <section class="story" id="odometry-story">
+        <div class="story-grid">
+          <div class="story-copy">
+            <h2>1. Dead Reckoning Drifts</h2>
+            <p>
+              A robot can estimate its movement from wheel encoders and gyros. This is called
+              <em>odometry</em>. It is fast, but tiny errors accumulate.
+            </p>
+            <p>
+              In blue you see the true robot path. In amber you see the odometry-only estimate.
+              Increase odometry noise and watch the estimate peel away.
+            </p>
+            <div class="readout" id="odometryReadout"></div>
+          </div>
+
+          <div class="viz-panel">
+            <canvas id="odometryCanvas" width="960" height="560"></canvas>
+            <div class="controls">
+              <label>
+                Odometry noise
+                <input id="odomNoise" type="range" min="0" max="2.5" step="0.05" value="0.8" />
+                <span id="odomNoiseValue">0.80</span>
+              </label>
+              <label>
+                Speed
+                <input id="odomSpeed" type="range" min="0.4" max="2" step="0.05" value="1" />
+                <span id="odomSpeedValue">1.00x</span>
+              </label>
+              <div class="button-row">
+                <button id="odomPlayPause">Pause</button>
+                <button id="odomReset" class="secondary">Reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="story" id="correction-story">
+        <div class="story-grid">
+          <div class="story-copy">
+            <h2>2. Landmarks Pull the Estimate Back</h2>
+            <p>
+              If the robot sees known landmarks (fiducials, poles, corners), it can correct its pose.
+              This is the measurement update step: combine prediction from odometry with sensor evidence.
+            </p>
+            <p>
+              The corrected estimate (teal) is constantly tugged toward consistency with visible landmarks.
+              Adjust the correction gain to feel the filter behavior.
+            </p>
+            <div class="readout" id="correctionReadout"></div>
+          </div>
+
+          <div class="viz-panel">
+            <canvas id="correctionCanvas" width="960" height="560"></canvas>
+            <div class="controls">
+              <label>
+                Odometry noise
+                <input id="corrOdomNoise" type="range" min="0" max="2.5" step="0.05" value="1.1" />
+                <span id="corrOdomNoiseValue">1.10</span>
+              </label>
+              <label>
+                Sensor noise
+                <input id="corrSensorNoise" type="range" min="0" max="2.5" step="0.05" value="0.6" />
+                <span id="corrSensorNoiseValue">0.60</span>
+              </label>
+              <label>
+                Correction gain
+                <input id="corrGain" type="range" min="0" max="1" step="0.02" value="0.42" />
+                <span id="corrGainValue">0.42</span>
+              </label>
+              <div class="button-row">
+                <button id="corrPlayPause">Pause</button>
+                <button id="corrReset" class="secondary">Reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="story" id="slam-story">
+        <div class="story-grid">
+          <div class="story-copy">
+            <h2>3. Full SLAM: Build the Map While Moving</h2>
+            <p>
+              Here landmarks are unknown at the start. The robot creates map points from observations,
+              then keeps refining both pose and map as it revisits the area.
+            </p>
+            <p>
+              Fading circles show uncertainty around landmark estimates. Re-observing landmarks shrinks
+              uncertainty and stabilizes the trajectory.
+            </p>
+            <div class="readout" id="slamReadout"></div>
+          </div>
+
+          <div class="viz-panel">
+            <canvas id="slamCanvas" width="960" height="560"></canvas>
+            <div class="controls">
+              <label>
+                Odometry noise
+                <input id="slamOdomNoise" type="range" min="0" max="2.5" step="0.05" value="1.2" />
+                <span id="slamOdomNoiseValue">1.20</span>
+              </label>
+              <label>
+                Sensor noise
+                <input id="slamSensorNoise" type="range" min="0" max="2.5" step="0.05" value="0.8" />
+                <span id="slamSensorNoiseValue">0.80</span>
+              </label>
+              <label>
+                Loop-closure gain
+                <input id="slamGain" type="range" min="0" max="1" step="0.02" value="0.33" />
+                <span id="slamGainValue">0.33</span>
+              </label>
+              <label class="checkbox">
+                <input id="slamShowTruth" type="checkbox" />
+                Show hidden ground-truth landmarks
+              </label>
+              <div class="button-row">
+                <button id="slamPlayPause">Pause</button>
+                <button id="slamReset" class="secondary">Reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        Tip: SLAM is a family of algorithms (EKF-SLAM, FastSLAM, Graph-SLAM, Visual SLAM). These
+        simulations are pedagogical and intentionally simplified.
+      </p>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>
