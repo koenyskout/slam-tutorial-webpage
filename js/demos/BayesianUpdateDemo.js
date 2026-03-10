@@ -1,6 +1,6 @@
 import { TAU } from "../core/constants.js";
 import { clamp, randn, wrapAngle } from "../core/math.js";
-import { drawGrid, drawInfoPanel, getMapper } from "../core/canvas.js";
+import { drawGrid, getMapper } from "../core/canvas.js";
 
 const COLORS = {
   truth: "#2f668e",
@@ -333,20 +333,6 @@ export class BayesianUpdateDemo {
     this.ctx.fillText("Posterior belief (green)", x, y + 48);
   }
 
-  drawCoordinatePanel(posterior, obs) {
-    drawInfoPanel(this.ctx, this.canvas, {
-      title: "In-Figure Coordinates",
-      width: 252,
-      lines: [
-        { text: `truth: (${this.truthPose.x.toFixed(1)}, ${this.truthPose.y.toFixed(1)})`, color: COLORS.truth },
-        { text: `prior: (${this.prior.x.toFixed(1)}, ${this.prior.y.toFixed(1)})`, color: COLORS.prior },
-        { text: `post : (${posterior.meanX.toFixed(1)}, ${posterior.meanY.toFixed(1)})`, color: COLORS.posterior },
-        { text: `lm   : (${this.landmark.x.toFixed(1)}, ${this.landmark.y.toFixed(1)})`, color: COLORS.landmark },
-        { text: `z(r,b): (${obs.range.toFixed(1)}, ${obs.angle.toFixed(2)} rad)`, color: COLORS.meas },
-      ],
-    });
-  }
-
   step() {
     this.draw();
   }
@@ -358,7 +344,6 @@ export class BayesianUpdateDemo {
     const stepSize = 3;
     const posterior = this.computePosteriorGrid(stepSize);
     const truth = this.truthPose;
-    const obs = this.measurementFromTruth();
 
     this.drawPriorCloud(mapper);
     this.drawMeasurementGeometry(mapper);
@@ -394,26 +379,6 @@ export class BayesianUpdateDemo {
 
     this.drawHandles(mapper);
     this.drawLegend(mapper);
-    this.drawCoordinatePanel(posterior, obs);
-
-    const priorToTruth = Math.hypot(truth.x - this.prior.x, truth.y - this.prior.y);
-    const priorToPost = Math.hypot(posterior.meanX - this.prior.x, posterior.meanY - this.prior.y);
-    const effectiveGain = priorToTruth > 1e-5 ? priorToPost / priorToTruth : 0;
-    const priorErr = Math.hypot(this.prior.x - truth.x, this.prior.y - truth.y);
-    const postErr = Math.hypot(posterior.meanX - truth.x, posterior.meanY - truth.y);
-    const reduction = priorErr > 1e-6 ? ((priorErr - postErr) / priorErr) * 100 : 0;
-
-    drawInfoPanel(this.ctx, this.canvas, {
-      title: "Fusion Result",
-      width: 320,
-      y: 140,
-      lines: [
-        `prior/post error: ${priorErr.toFixed(2)} / ${postErr.toFixed(2)}`,
-        `error reduction: ${reduction.toFixed(1)}%`,
-        `post sigma(eq): ${posterior.eqSigma.toFixed(2)}`,
-        `MAP: (${posterior.mapX.toFixed(1)}, ${posterior.mapY.toFixed(1)})`,
-        `shift fraction: ${effectiveGain.toFixed(3)}`,
-      ],
-    });
+    // Keep the Bayesian map view unobstructed; all key state is shown by colors and labels on the map.
   }
 }

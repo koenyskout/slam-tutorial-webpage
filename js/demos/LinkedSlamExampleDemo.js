@@ -157,7 +157,7 @@ export class LinkedSlamExampleDemo {
 
   updateControls() {
     if (this.nextBtn) {
-      this.nextBtn.textContent = this.needsCorrection() ? "Next: Correct (3-4)" : "Next: Predict (1-2)";
+      this.nextBtn.textContent = this.needsCorrection() ? "Next: Correct" : "Next: Predict";
     }
   }
 
@@ -371,9 +371,9 @@ export class LinkedSlamExampleDemo {
     this.ctx.fillStyle = THEME.truePath;
     this.ctx.fillText("truth", x, y);
     this.ctx.fillStyle = THEME.odomPath;
-    this.ctx.fillText("predicted x^-", x, y + 16);
+    this.ctx.fillText("predicted", x, y + 16);
     this.ctx.fillStyle = THEME.correctedPath;
-    this.ctx.fillText("corrected x^+", x, y + 32);
+    this.ctx.fillText("corrected", x, y + 32);
   }
 
   drawCoordinatePanel() {
@@ -383,9 +383,9 @@ export class LinkedSlamExampleDemo {
       { text: `truth: (${this.truth.x.toFixed(1)}, ${this.truth.y.toFixed(1)})`, color: THEME.truePath },
     ];
     if (this.predicted) {
-      lines.push({ text: `x^-  : (${this.predicted.x.toFixed(1)}, ${this.predicted.y.toFixed(1)})`, color: THEME.odomPath });
+      lines.push({ text: `pred : (${this.predicted.x.toFixed(1)}, ${this.predicted.y.toFixed(1)})`, color: THEME.odomPath });
     }
-    lines.push({ text: `x^+  : (${this.estimate.x.toFixed(1)}, ${this.estimate.y.toFixed(1)})`, color: THEME.correctedPath });
+    lines.push({ text: `corr : (${this.estimate.x.toFixed(1)}, ${this.estimate.y.toFixed(1)})`, color: THEME.correctedPath });
 
     if (this.last && this.last.landmark) {
       lines.push({
@@ -398,56 +398,14 @@ export class LinkedSlamExampleDemo {
     }
     lines.push(
       errPred == null
-        ? `err: ||truth-x^+||=${errPost.toFixed(2)}`
-        : `err: ||truth-x^-||=${errPred.toFixed(2)}, ||truth-x^+||=${errPost.toFixed(2)}`,
+        ? `error to truth: ${errPost.toFixed(2)}`
+        : `error pred/corr: ${errPred.toFixed(2)} / ${errPost.toFixed(2)}`,
     );
 
     drawInfoPanel(this.ctx, this.canvas, {
       title: "In-Figure Coordinates",
       width: 272,
       lines,
-    });
-  }
-
-  updateReadout() {
-    if (!this.last) {
-      drawInfoPanel(this.ctx, this.canvas, {
-        title: "Equation Terms",
-        width: 520,
-        y: 160,
-        lines: [
-          "Press Next for guided flow: Predict, then Correct, repeating.",
-          "You can still use Predict/Correct/Step directly.",
-        ],
-      });
-      return;
-    }
-
-    const trPred = this.predicted ? this.PPred[0][0] + this.PPred[1][1] + this.PPred[2][2] : 0;
-    const trPost = this.P[0][0] + this.P[1][1] + this.P[2][2];
-    const k = this.last.K;
-    const kSummary = k ? `[[${k[0][0].toFixed(2)}, ${k[0][1].toFixed(2)}], [${k[1][0].toFixed(2)}, ${k[1][1].toFixed(2)}], [${k[2][0].toFixed(2)}, ${k[2][1].toFixed(2)}]]` : "n/a";
-    const innovation = this.last.innovation
-      ? `(${this.last.innovation[0].toFixed(2)}, ${this.last.innovation[1].toFixed(3)})`
-      : "n/a";
-    const zText = this.last.z ? `(${this.last.z.range.toFixed(2)}, ${this.last.z.bearing.toFixed(3)})` : "n/a";
-    const errText =
-      this.last.errPost == null
-        ? `prediction error ||x_true - x^-||: ${this.last.errPred.toFixed(2)}`
-        : `error ||x_true - x^-|| -> ||x_true - x^+||: ${this.last.errPred.toFixed(2)} -> ${this.last.errPost.toFixed(2)}`;
-
-    drawInfoPanel(this.ctx, this.canvas, {
-      title: "Equation Terms",
-      width: 520,
-      y: 160,
-      lines: [
-        `Eq.(1) x^- = f(x,u), u=(Δs=${this.last.u.ds.toFixed(2)}, Δθ=${this.last.u.dtheta.toFixed(2)} rad)`,
-        `Eq.(2) P^- = FPF^T + Q, trace(P^-)=${trPred.toFixed(3)}`,
-        `Eq.(3) K = P^-H^T(HP^-H^T+R)^-1, K=${kSummary}`,
-        `Eq.(4) x^+ = x^- + K(z-h(x^-)), z=${zText}, innovation=${innovation}`,
-        `trace(P^+)=${trPost.toFixed(3)}, ${errText}`,
-        `observed landmark: ${this.last.landmark ? this.last.landmark.id : "n/a"}`,
-      ],
     });
   }
 
@@ -459,7 +417,7 @@ export class LinkedSlamExampleDemo {
 
     if (this.predicted) {
       this.drawCovariance(mapper, this.predicted, this.PPred, "rgba(161,112,52,0.95)");
-      drawRobot(this.ctx, mapper, this.predicted, THEME.odomPath, "x^-");
+      drawRobot(this.ctx, mapper, this.predicted, THEME.odomPath, "pred");
     }
 
     this.drawCovariance(mapper, this.estimate, this.P, "rgba(45,131,119,0.95)");
@@ -477,7 +435,6 @@ export class LinkedSlamExampleDemo {
 
     this.drawLegend(mapper);
     this.drawCoordinatePanel();
-    this.updateReadout();
   }
 
   step() {

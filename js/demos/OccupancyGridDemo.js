@@ -1,7 +1,6 @@
 import { TAU, THEME } from "../core/constants.js";
 import { clamp, lerp, logistic, randn } from "../core/math.js";
 import { installPlayOverlay } from "../core/playOverlay.js";
-import { drawInfoPanel } from "../core/canvas.js";
 
 export class OccupancyGridDemo {
   constructor() {
@@ -618,28 +617,7 @@ export class OccupancyGridDemo {
     this.drawRobotOnPanel(leftPanel, THEME.correctedPath);
     this.drawRobotOnPanel(rightPanel, THEME.odomPath);
 
-    const stats = this.mapStats();
-    const pathRemaining = this.currentPath && this.pathIndex < this.currentPath.length
-      ? this.currentPath.length - this.pathIndex
-      : 0;
-    const status = this.explorationComplete
-      ? `completed (${this.completionReason})`
-      : this.exploreMode;
-
-    const panelTop = top + this.gridH * size + 16;
-    drawInfoPanel(this.ctx, this.canvas, {
-      title: "Occupancy + Frontier Exploration",
-      anchor: "top-left",
-      x: sidePad,
-      y: panelTop,
-      width: canvas.width - sidePad * 2,
-      lines: [
-        `scans: ${this.scanCount}   mode: ${status}   path steps remaining: ${pathRemaining}`,
-        `frontiers total/reachable: ${this.frontierCount}/${this.reachableFrontierCount}   dots: orange markers`,
-        `occupied threshold (log-odds): ${this.occupiedThreshold.toFixed(2)}   confident cells: ${stats.known}/${this.gridW * this.gridH}`,
-        `accuracy on confident cells: ${(stats.accuracy * 100).toFixed(1)}%   mean entropy: ${stats.meanEntropy.toFixed(3)} bits`,
-        `collision-avoiding replans: ${this.collisionAvoids}`,
-      ],
-    });
+    // Keep occupancy figure unobstructed; state is communicated through map colors,
+    // frontier markers, path, and panel titles.
   }
 }
