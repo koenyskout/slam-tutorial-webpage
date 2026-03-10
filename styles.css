@@ -188,6 +188,7 @@ h2 {
   border-radius: 7px;
   background: var(--surface);
   overflow: hidden;
+  position: relative;
 }
 
 canvas {
@@ -195,6 +196,47 @@ canvas {
   display: block;
   border-bottom: 1px solid var(--line);
   background: #fdfefe;
+}
+
+.canvas-play-overlay {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at center, rgba(248, 251, 254, 0.56) 0%, rgba(241, 246, 251, 0.78) 70%);
+  pointer-events: none;
+}
+
+.canvas-play-overlay.is-hidden {
+  display: none;
+}
+
+.canvas-play-button {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  border: 1px solid #a9b9c7;
+  background: rgba(255, 255, 255, 0.96);
+  color: #1f3344;
+  border-radius: 999px;
+  padding: 0.72rem 1.12rem;
+  font: 600 1.05rem "IBM Plex Sans", "Avenir Next", sans-serif;
+  box-shadow: 0 10px 24px rgba(67, 88, 106, 0.2);
+}
+
+.canvas-play-button:hover {
+  background: #ffffff;
+}
+
+.canvas-play-button__icon {
+  width: 0;
+  height: 0;
+  border-top: 0.42rem solid transparent;
+  border-bottom: 0.42rem solid transparent;
+  border-left: 0.67rem solid #2f668e;
+  margin-left: 0.12rem;
 }
 
 .controls {

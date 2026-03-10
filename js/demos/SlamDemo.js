@@ -1,6 +1,7 @@
 import { TAU, THEME } from "../core/constants.js";
 import { clamp, makeLandmarks, randn, wrapAngle } from "../core/math.js";
 import { clampPose, drawGrid, drawPath, drawRobot, getMapper } from "../core/canvas.js";
+import { installPlayOverlay } from "../core/playOverlay.js";
 import { modelC } from "../core/models.js";
 
 export class SlamDemo {
@@ -24,6 +25,16 @@ export class SlamDemo {
     this.running = false;
     this.reset();
     this.bindEvents();
+    this.playOverlay = installPlayOverlay({
+      canvas: this.canvas,
+      onPlay: () => {
+        this.running = true;
+        this.playPause.textContent = "Pause";
+        this.playOverlay.update();
+      },
+      getVisible: () => !this.running,
+      label: "Play full SLAM demo",
+    });
   }
 
   bindEvents() {
@@ -40,9 +51,13 @@ export class SlamDemo {
     this.playPause.addEventListener("click", () => {
       this.running = !this.running;
       this.playPause.textContent = this.running ? "Pause" : "Play";
+      this.playOverlay?.update();
     });
 
-    this.resetBtn.addEventListener("click", () => this.reset());
+    this.resetBtn.addEventListener("click", () => {
+      this.reset();
+      this.playOverlay?.update();
+    });
   }
 
   reset() {
@@ -76,6 +91,7 @@ export class SlamDemo {
   }
 
   step(dt) {
+    this.playOverlay?.update();
     if (!this.running) {
       this.draw();
       return;

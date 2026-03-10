@@ -1,6 +1,7 @@
 import { THEME } from "../core/constants.js";
 import { randn, wrapAngle } from "../core/math.js";
 import { clampPose, drawGrid, drawPath, drawRobot, getMapper } from "../core/canvas.js";
+import { installPlayOverlay } from "../core/playOverlay.js";
 import { modelA } from "../core/models.js";
 
 export class OdometryDemo {
@@ -19,6 +20,16 @@ export class OdometryDemo {
     this.running = false;
     this.reset();
     this.bindEvents();
+    this.playOverlay = installPlayOverlay({
+      canvas: this.canvas,
+      onPlay: () => {
+        this.running = true;
+        this.playPause.textContent = "Pause";
+        this.playOverlay.update();
+      },
+      getVisible: () => !this.running,
+      label: "Play odometry demo",
+    });
   }
 
   bindEvents() {
@@ -33,10 +44,12 @@ export class OdometryDemo {
     this.playPause.addEventListener("click", () => {
       this.running = !this.running;
       this.playPause.textContent = this.running ? "Pause" : "Play";
+      this.playOverlay?.update();
     });
 
     this.resetBtn.addEventListener("click", () => {
       this.reset();
+      this.playOverlay?.update();
     });
   }
 
@@ -55,6 +68,7 @@ export class OdometryDemo {
   }
 
   step(dt) {
+    this.playOverlay?.update();
     if (!this.running) {
       this.draw();
       return;

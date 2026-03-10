@@ -1,6 +1,7 @@
 import { THEME } from "../core/constants.js";
 import { lerp, makeLandmarks, randn, wrapAngle } from "../core/math.js";
 import { clampPose, drawGrid, drawPath, drawRobot, getMapper } from "../core/canvas.js";
+import { installPlayOverlay } from "../core/playOverlay.js";
 import { modelB } from "../core/models.js";
 
 export class CorrectionDemo {
@@ -22,6 +23,16 @@ export class CorrectionDemo {
     this.running = false;
     this.reset();
     this.bindEvents();
+    this.playOverlay = installPlayOverlay({
+      canvas: this.canvas,
+      onPlay: () => {
+        this.running = true;
+        this.playPause.textContent = "Pause";
+        this.playOverlay.update();
+      },
+      getVisible: () => !this.running,
+      label: "Play correction demo",
+    });
   }
 
   bindEvents() {
@@ -38,9 +49,13 @@ export class CorrectionDemo {
     this.playPause.addEventListener("click", () => {
       this.running = !this.running;
       this.playPause.textContent = this.running ? "Pause" : "Play";
+      this.playOverlay?.update();
     });
 
-    this.resetBtn.addEventListener("click", () => this.reset());
+    this.resetBtn.addEventListener("click", () => {
+      this.reset();
+      this.playOverlay?.update();
+    });
   }
 
   reset() {
@@ -60,6 +75,7 @@ export class CorrectionDemo {
   }
 
   step(dt) {
+    this.playOverlay?.update();
     if (!this.running) {
       this.draw();
       return;

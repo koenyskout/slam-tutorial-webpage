@@ -1,6 +1,7 @@
 import { TAU, THEME } from "../core/constants.js";
 import { clamp, randn, wrapAngle } from "../core/math.js";
 import { drawGrid, drawRobot, getMapper } from "../core/canvas.js";
+import { installPlayOverlay } from "../core/playOverlay.js";
 
 export class DataAssociationDemo {
   constructor() {
@@ -22,6 +23,16 @@ export class DataAssociationDemo {
     this.running = false;
     this.bindEvents();
     this.reset();
+    this.playOverlay = installPlayOverlay({
+      canvas: this.canvas,
+      onPlay: () => {
+        this.running = true;
+        this.playPause.textContent = "Pause";
+        this.playOverlay.update();
+      },
+      getVisible: () => !this.running,
+      label: "Play data association demo",
+    });
   }
 
   bindEvents() {
@@ -38,9 +49,13 @@ export class DataAssociationDemo {
     this.playPause.addEventListener("click", () => {
       this.running = !this.running;
       this.playPause.textContent = this.running ? "Pause" : "Play";
+      this.playOverlay?.update();
     });
     this.resampleBtn.addEventListener("click", () => this.sampleObservation());
-    this.resetBtn.addEventListener("click", () => this.reset());
+    this.resetBtn.addEventListener("click", () => {
+      this.reset();
+      this.playOverlay?.update();
+    });
 
     this.canvas.addEventListener("mousedown", (event) => this.onPointerDown(event));
     window.addEventListener("mousemove", (event) => this.onPointerMove(event));
@@ -152,6 +167,7 @@ export class DataAssociationDemo {
   }
 
   step(dt) {
+    this.playOverlay?.update();
     if (this.running) {
       this.timer += dt;
       if (this.timer > 0.85) {

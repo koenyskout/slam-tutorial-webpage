@@ -1,5 +1,6 @@
 import { TAU, THEME } from "../core/constants.js";
 import { clamp, lerp, logistic, randn } from "../core/math.js";
+import { installPlayOverlay } from "../core/playOverlay.js";
 
 export class OccupancyGridDemo {
   constructor() {
@@ -22,6 +23,17 @@ export class OccupancyGridDemo {
     this.running = false;
     this.bindEvents();
     this.reset();
+    this.playOverlay = installPlayOverlay({
+      canvas: this.canvas,
+      onPlay: () => {
+        if (this.explorationComplete) return;
+        this.running = true;
+        this.playPause.textContent = "Pause";
+        this.playOverlay.update();
+      },
+      getVisible: () => !this.running && !this.explorationComplete,
+      label: "Play occupancy mapping demo",
+    });
   }
 
   bindEvents() {
@@ -38,8 +50,12 @@ export class OccupancyGridDemo {
       if (this.explorationComplete) return;
       this.running = !this.running;
       this.playPause.textContent = this.running ? "Pause" : "Play";
+      this.playOverlay?.update();
     });
-    this.resetBtn.addEventListener("click", () => this.reset());
+    this.resetBtn.addEventListener("click", () => {
+      this.reset();
+      this.playOverlay?.update();
+    });
   }
 
   createTruthGrid() {
@@ -449,6 +465,7 @@ export class OccupancyGridDemo {
   }
 
   step(dt) {
+    this.playOverlay?.update();
     if (this.running) {
       this.advancePose(dt);
       this.performScan();
