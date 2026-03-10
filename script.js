@@ -39,6 +39,16 @@ function randn() {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v);
 }
 
+function gaussianPdf(x, mean, sigma) {
+  const s = Math.max(1e-6, sigma);
+  const z = (x - mean) / s;
+  return Math.exp(-0.5 * z * z) / (s * Math.sqrt(2 * Math.PI));
+}
+
+function logistic(x) {
+  return 1 / (1 + Math.exp(-x));
+}
+
 function seededRandom(seed) {
   let s = seed >>> 0;
   return () => {
@@ -186,6 +196,463 @@ function modelC(t) {
   const dx = -28 * 0.55 * Math.sin(0.55 * t) - 7 * 1.9 * Math.sin(1.9 * t + 0.7);
   const dy = 24 * 0.64 * Math.cos(0.64 * t) + 8 * 2.1 * Math.cos(2.1 * t);
   return { x, y, theta: Math.atan2(dy, dx) };
+}
+
+class FrameTransformDemo {
+  constructor() {
+    this.canvas = document.getElementById("framesCanvas");
+    this.ctx = this.canvas.getContext("2d");
+    this.readout = document.getElementById("framesReadout");
+
+    this.frameX = document.getElementById("frameX");
+    this.frameY = document.getElementById("frameY");
+    this.frameTheta = document.getElementById("frameTheta");
+    this.localX = document.getElementById("frameLocalX");
+    this.localY = document.getElementById("frameLocalY");
+
+    this.frameXValue = document.getElementById("frameXValue");
+    this.frameYValue = document.getElementById("frameYValue");
+    this.frameThetaValue = document.getElementById("frameThetaValue");
+    this.localXValue = document.getElementById("frameLocalXValue");
+    this.localYValue = document.getElementById("frameLocalYValue");
+
+    this.resetBtn = document.getElementById("frameReset");
+    this.bindEvents();
+    this.reset();
+  }
+
+  bindEvents() {
+    const update = () => this.updateLabels();
+    this.frameX.addEventListener("input", update);
+    this.frameY.addEventListener("input", update);
+    this.frameTheta.addEventListener("input", update);
+    this.localX.addEventListener("input", update);
+    this.localY.addEventListener("input", update);
+    this.resetBtn.addEventListener("click", () => this.reset());
+  }
+
+  reset() {
+    this.frameX.value = "45";
+    this.frameY.value = "40";
+    this.frameTheta.value = "0.8";
+    this.localX.value = "12";
+    this.localY.value = "7";
+    this.updateLabels();
+    this.draw();
+  }
+
+  updateLabels() {
+    this.frameXValue.textContent = Number(this.frameX.value).toFixed(1);
+    this.frameYValue.textContent = Number(this.frameY.value).toFixed(1);
+    this.frameThetaValue.textContent = `${Number(this.frameTheta.value).toFixed(2)} rad`;
+    this.localXValue.textContent = Number(this.localX.value).toFixed(1);
+    this.localYValue.textContent = Number(this.localY.value).toFixed(1);
+  }
+
+  step() {
+    this.draw();
+  }
+
+  draw() {
+    const mapper = getMapper(this.canvas);
+    drawGrid(this.ctx, this.canvas, mapper);
+
+    const rx = Number(this.frameX.value);
+    const ry = Number(this.frameY.value);
+    const theta = Number(this.frameTheta.value);
+    const lx = Number(this.localX.value);
+    const ly = Number(this.localY.value);
+
+    const wx = rx + lx * Math.cos(theta) - ly * Math.sin(theta);
+    const wy = ry + lx * Math.sin(theta) + ly * Math.cos(theta);
+
+    const originX = mapper.toX(rx);
+    const originY = mapper.toY(ry);
+    const ux = Math.cos(theta);
+    const uy = Math.sin(theta);
+    const vx = -Math.sin(theta);
+    const vy = Math.cos(theta);
+
+    this.ctx.strokeStyle = "#4d7394";
+    this.ctx.lineWidth = 2;
+    this.ctx.beginPath();
+    this.ctx.moveTo(originX, originY);
+    this.ctx.lineTo(mapper.toX(rx + ux * 10), mapper.toY(ry + uy * 10));
+    this.ctx.stroke();
+
+    this.ctx.strokeStyle = "#7f9b59";
+    this.ctx.beginPath();
+    this.ctx.moveTo(originX, originY);
+    this.ctx.lineTo(mapper.toX(rx + vx * 10), mapper.toY(ry + vy * 10));
+    this.ctx.stroke();
+
+    this.ctx.strokeStyle = "rgba(161,112,52,0.7)";
+    this.ctx.setLineDash([6, 5]);
+    this.ctx.beginPath();
+    this.ctx.moveTo(originX, originY);
+    this.ctx.lineTo(mapper.toX(wx), mapper.toY(wy));
+    this.ctx.stroke();
+    this.ctx.setLineDash([]);
+
+    this.ctx.fillStyle = "#a17034";
+    this.ctx.beginPath();
+    this.ctx.arc(mapper.toX(wx), mapper.toY(wy), 5.5, 0, TAU);
+    this.ctx.fill();
+    this.ctx.font = "12px IBM Plex Mono";
+    this.ctx.fillText("transformed point", mapper.toX(wx) + 7, mapper.toY(wy) - 8);
+
+    drawRobot(this.ctx, mapper, { x: rx, y: ry, theta }, THEME.truePath, "robot frame");
+
+    this.readout.textContent =
+      `Robot pose: (${rx.toFixed(1)}, ${ry.toFixed(1)}, ${theta.toFixed(2)} rad)\n` +
+      `Local point: (${lx.toFixed(1)}, ${ly.toFixed(1)})\n` +
+      `World point: (${wx.toFixed(2)}, ${wy.toFixed(2)})\n` +
+      `Transform: [R(θ)|t] · p_local = p_world`;
+  }
+}
+
+class BayesianUpdateDemo {
+  constructor() {
+    this.canvas = document.getElementById("bayesCanvas");
+    this.ctx = this.canvas.getContext("2d");
+    this.readout = document.getElementById("bayesReadout");
+
+    this.priorMean = document.getElementById("bayesPriorMean");
+    this.priorSigma = document.getElementById("bayesPriorSigma");
+    this.measValue = document.getElementById("bayesMeasValue");
+    this.measSigma = document.getElementById("bayesMeasSigma");
+
+    this.priorMeanValue = document.getElementById("bayesPriorMeanValue");
+    this.priorSigmaValue = document.getElementById("bayesPriorSigmaValue");
+    this.measValueValue = document.getElementById("bayesMeasValueValue");
+    this.measSigmaValue = document.getElementById("bayesMeasSigmaValue");
+
+    this.resetBtn = document.getElementById("bayesReset");
+    this.bindEvents();
+    this.reset();
+  }
+
+  bindEvents() {
+    const update = () => this.updateLabels();
+    this.priorMean.addEventListener("input", update);
+    this.priorSigma.addEventListener("input", update);
+    this.measValue.addEventListener("input", update);
+    this.measSigma.addEventListener("input", update);
+    this.resetBtn.addEventListener("click", () => this.reset());
+  }
+
+  reset() {
+    this.priorMean.value = "45";
+    this.priorSigma.value = "11";
+    this.measValue.value = "62";
+    this.measSigma.value = "7";
+    this.updateLabels();
+    this.draw();
+  }
+
+  updateLabels() {
+    this.priorMeanValue.textContent = Number(this.priorMean.value).toFixed(1);
+    this.priorSigmaValue.textContent = Number(this.priorSigma.value).toFixed(1);
+    this.measValueValue.textContent = Number(this.measValue.value).toFixed(1);
+    this.measSigmaValue.textContent = Number(this.measSigma.value).toFixed(1);
+  }
+
+  step() {
+    this.draw();
+  }
+
+  drawCurve(xToPx, yToPx, mean, sigma, color) {
+    this.ctx.strokeStyle = color;
+    this.ctx.lineWidth = 2.2;
+    this.ctx.beginPath();
+    for (let x = 0; x <= 100; x += 0.5) {
+      const y = gaussianPdf(x, mean, sigma);
+      const px = xToPx(x);
+      const py = yToPx(y);
+      if (x === 0) this.ctx.moveTo(px, py);
+      else this.ctx.lineTo(px, py);
+    }
+    this.ctx.stroke();
+  }
+
+  draw() {
+    const ctx = this.ctx;
+    const canvas = this.canvas;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const priorMean = Number(this.priorMean.value);
+    const priorSigma = Number(this.priorSigma.value);
+    const measValue = Number(this.measValue.value);
+    const measSigma = Number(this.measSigma.value);
+
+    const priorVar = priorSigma * priorSigma;
+    const measVar = measSigma * measSigma;
+    const gain = priorVar / (priorVar + measVar);
+    const postMean = priorMean + gain * (measValue - priorMean);
+    const postSigma = Math.sqrt((1 - gain) * priorVar);
+
+    const left = 66;
+    const right = canvas.width - 28;
+    const top = 26;
+    const bottom = canvas.height - 54;
+    const maxPdf =
+      Math.max(
+        gaussianPdf(priorMean, priorMean, priorSigma),
+        gaussianPdf(measValue, measValue, measSigma),
+        gaussianPdf(postMean, postMean, postSigma),
+      ) * 1.15;
+
+    const xToPx = (x) => left + (x / 100) * (right - left);
+    const yToPx = (y) => bottom - (y / maxPdf) * (bottom - top);
+
+    ctx.strokeStyle = "rgba(113,132,148,0.6)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(left, bottom);
+    ctx.lineTo(right, bottom);
+    ctx.stroke();
+
+    for (let x = 0; x <= 100; x += 10) {
+      const px = xToPx(x);
+      ctx.strokeStyle = "rgba(125,145,162,0.2)";
+      ctx.beginPath();
+      ctx.moveTo(px, top);
+      ctx.lineTo(px, bottom);
+      ctx.stroke();
+      ctx.fillStyle = "#4e6475";
+      ctx.font = "11px IBM Plex Mono";
+      ctx.fillText(`${x}`, px - 8, bottom + 16);
+    }
+
+    this.drawCurve(xToPx, yToPx, priorMean, priorSigma, THEME.truePath);
+    this.drawCurve(xToPx, yToPx, measValue, measSigma, THEME.odomPath);
+    this.drawCurve(xToPx, yToPx, postMean, postSigma, THEME.correctedPath);
+
+    ctx.strokeStyle = THEME.correctedPath;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(xToPx(postMean), top);
+    ctx.lineTo(xToPx(postMean), bottom);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = THEME.truePath;
+    ctx.fillText("prior belief", left + 8, top + 16);
+    ctx.fillStyle = THEME.odomPath;
+    ctx.fillText("measurement likelihood", left + 8, top + 33);
+    ctx.fillStyle = THEME.correctedPath;
+    ctx.fillText("posterior belief", left + 8, top + 50);
+
+    this.readout.textContent =
+      `Kalman gain K: ${gain.toFixed(3)}\n` +
+      `Posterior mean: ${postMean.toFixed(2)}\n` +
+      `Posterior sigma: ${postSigma.toFixed(2)}\n` +
+      `Interpretation: trust the lower-variance source more strongly.`;
+  }
+}
+
+class DataAssociationDemo {
+  constructor() {
+    this.canvas = document.getElementById("associationCanvas");
+    this.ctx = this.canvas.getContext("2d");
+    this.readout = document.getElementById("associationReadout");
+
+    this.noise = document.getElementById("assocNoise");
+    this.noiseValue = document.getElementById("assocNoiseValue");
+    this.spacing = document.getElementById("assocSpacing");
+    this.spacingValue = document.getElementById("assocSpacingValue");
+    this.playPause = document.getElementById("assocPlayPause");
+    this.resampleBtn = document.getElementById("assocResample");
+    this.resetBtn = document.getElementById("assocReset");
+
+    this.robot = { x: 32, y: 42, theta: 0.35 };
+    this.running = true;
+    this.bindEvents();
+    this.reset();
+  }
+
+  bindEvents() {
+    this.noise.addEventListener("input", () => {
+      this.noiseValue.textContent = Number(this.noise.value).toFixed(2);
+      this.sampleObservation();
+    });
+    this.spacing.addEventListener("input", () => {
+      this.spacingValue.textContent = Number(this.spacing.value).toFixed(1);
+      this.createLandmarks();
+      this.sampleObservation();
+    });
+    this.playPause.addEventListener("click", () => {
+      this.running = !this.running;
+      this.playPause.textContent = this.running ? "Pause" : "Play";
+    });
+    this.resampleBtn.addEventListener("click", () => this.sampleObservation());
+    this.resetBtn.addEventListener("click", () => this.reset());
+  }
+
+  reset() {
+    this.noise.value = "1";
+    this.spacing.value = "6";
+    this.noiseValue.textContent = "1.00";
+    this.spacingValue.textContent = "6.0";
+    this.running = true;
+    this.playPause.textContent = "Pause";
+    this.timer = 0;
+    this.totalSamples = 0;
+    this.wrongSamples = 0;
+    this.createLandmarks();
+    this.sampleObservation();
+  }
+
+  createLandmarks() {
+    const separation = Number(this.spacing.value);
+    this.landmarks = [
+      { id: "L1", x: 70 - separation / 2, y: 60, truth: true },
+      { id: "L2", x: 70 + separation / 2, y: 60 },
+      { id: "L3", x: 74, y: 38 },
+    ];
+  }
+
+  sampleObservation() {
+    const noise = Number(this.noise.value);
+    const sigmaR = 0.55 + noise * 0.8;
+    const sigmaB = 0.012 + noise * 0.018;
+    const truthLm = this.landmarks[0];
+
+    const tdx = truthLm.x - this.robot.x;
+    const tdy = truthLm.y - this.robot.y;
+    const trueRange = Math.hypot(tdx, tdy);
+    const trueBearing = wrapAngle(Math.atan2(tdy, tdx) - this.robot.theta);
+
+    const obsRange = trueRange + randn() * sigmaR;
+    const obsBearing = wrapAngle(trueBearing + randn() * sigmaB);
+    const likelihoods = [];
+
+    for (const lm of this.landmarks) {
+      const dx = lm.x - this.robot.x;
+      const dy = lm.y - this.robot.y;
+      const predRange = Math.hypot(dx, dy);
+      const predBearing = wrapAngle(Math.atan2(dy, dx) - this.robot.theta);
+      const dr = obsRange - predRange;
+      const db = wrapAngle(obsBearing - predBearing);
+      const n2 = (dr * dr) / (sigmaR * sigmaR) + (db * db) / (sigmaB * sigmaB);
+      likelihoods.push(Math.exp(-0.5 * n2));
+    }
+
+    const sum = likelihoods.reduce((acc, value) => acc + value, 0);
+    const probs = likelihoods.map((v) => (sum > 0 ? v / sum : 1 / likelihoods.length));
+    let selected = 0;
+    for (let i = 1; i < probs.length; i += 1) {
+      if (probs[i] > probs[selected]) selected = i;
+    }
+
+    this.totalSamples += 1;
+    if (selected !== 0) this.wrongSamples += 1;
+
+    this.observation = {
+      range: obsRange,
+      bearing: obsBearing,
+      probs,
+      selected,
+      sigmaR,
+      sigmaB,
+    };
+  }
+
+  step(dt) {
+    if (this.running) {
+      this.timer += dt;
+      if (this.timer > 0.85) {
+        this.timer = 0;
+        this.sampleObservation();
+      }
+    }
+    this.draw();
+  }
+
+  drawProbabilityBars() {
+    const ctx = this.ctx;
+    const x0 = 24;
+    const y0 = 26;
+    const barW = 145;
+    const barH = 10;
+    ctx.fillStyle = "#2b3f50";
+    ctx.font = "12px IBM Plex Mono";
+    ctx.fillText("Association probability", x0, y0 - 8);
+
+    this.observation.probs.forEach((p, idx) => {
+      const y = y0 + idx * 18;
+      ctx.strokeStyle = "rgba(124, 141, 156, 0.55)";
+      ctx.strokeRect(x0, y, barW, barH);
+      ctx.fillStyle = idx === this.observation.selected ? "rgba(45,131,119,0.75)" : "rgba(79,111,138,0.45)";
+      ctx.fillRect(x0, y, barW * p, barH);
+      ctx.fillStyle = "#2b3f50";
+      ctx.fillText(`${this.landmarks[idx].id}: ${(p * 100).toFixed(1)}%`, x0 + barW + 12, y + 9);
+    });
+  }
+
+  draw() {
+    const mapper = getMapper(this.canvas);
+    drawGrid(this.ctx, this.canvas, mapper);
+    this.drawProbabilityBars();
+
+    for (let i = 0; i < this.landmarks.length; i += 1) {
+      const lm = this.landmarks[i];
+      const selected = i === this.observation.selected;
+      this.ctx.fillStyle = lm.truth ? THEME.truePath : THEME.landmark;
+      this.ctx.beginPath();
+      this.ctx.arc(mapper.toX(lm.x), mapper.toY(lm.y), 4.8, 0, TAU);
+      this.ctx.fill();
+
+      if (selected) {
+        this.ctx.strokeStyle = lm.truth ? "rgba(45,131,119,0.9)" : "rgba(171,79,66,0.9)";
+        this.ctx.lineWidth = 2.2;
+        this.ctx.beginPath();
+        this.ctx.arc(mapper.toX(lm.x), mapper.toY(lm.y), 8.2, 0, TAU);
+        this.ctx.stroke();
+      }
+
+      this.ctx.fillStyle = "#2d3f4f";
+      this.ctx.font = "11px IBM Plex Mono";
+      this.ctx.fillText(lm.id, mapper.toX(lm.x) + 6, mapper.toY(lm.y) - 6);
+    }
+
+    const truth = this.landmarks[0];
+    this.ctx.strokeStyle = "rgba(47,102,142,0.52)";
+    this.ctx.setLineDash([5, 4]);
+    this.ctx.beginPath();
+    this.ctx.moveTo(mapper.toX(this.robot.x), mapper.toY(this.robot.y));
+    this.ctx.lineTo(mapper.toX(truth.x), mapper.toY(truth.y));
+    this.ctx.stroke();
+    this.ctx.setLineDash([]);
+
+    const measuredHeading = this.robot.theta + this.observation.bearing;
+    const mx = this.robot.x + this.observation.range * Math.cos(measuredHeading);
+    const my = this.robot.y + this.observation.range * Math.sin(measuredHeading);
+    this.ctx.strokeStyle = "rgba(161,112,52,0.8)";
+    this.ctx.setLineDash([8, 5]);
+    this.ctx.beginPath();
+    this.ctx.moveTo(mapper.toX(this.robot.x), mapper.toY(this.robot.y));
+    this.ctx.lineTo(mapper.toX(mx), mapper.toY(my));
+    this.ctx.stroke();
+    this.ctx.setLineDash([]);
+
+    const selectedLm = this.landmarks[this.observation.selected];
+    this.ctx.strokeStyle = this.observation.selected === 0 ? "rgba(45,131,119,0.8)" : "rgba(171,79,66,0.85)";
+    this.ctx.lineWidth = 1.8;
+    this.ctx.beginPath();
+    this.ctx.moveTo(mapper.toX(this.robot.x), mapper.toY(this.robot.y));
+    this.ctx.lineTo(mapper.toX(selectedLm.x), mapper.toY(selectedLm.y));
+    this.ctx.stroke();
+
+    drawRobot(this.ctx, mapper, this.robot, THEME.odomPath, "robot");
+
+    const wrongRate = this.totalSamples > 0 ? (100 * this.wrongSamples) / this.totalSamples : 0;
+    this.readout.textContent =
+      `Selected landmark: ${selectedLm.id} (${this.observation.selected === 0 ? "correct" : "wrong"})\n` +
+      `p(L1/L2/L3): ${this.observation.probs.map((p) => p.toFixed(2)).join(" / ")}\n` +
+      `Wrong association rate: ${wrongRate.toFixed(1)}% (${this.wrongSamples}/${this.totalSamples})\n` +
+      `Lower separation + higher noise => more ambiguous matches.`;
+  }
 }
 
 class OdometryDemo {
@@ -749,6 +1216,301 @@ class SlamDemo {
   }
 }
 
+class OccupancyGridDemo {
+  constructor() {
+    this.canvas = document.getElementById("occupancyCanvas");
+    this.ctx = this.canvas.getContext("2d");
+    this.readout = document.getElementById("occupancyReadout");
+
+    this.beams = document.getElementById("occBeams");
+    this.beamsValue = document.getElementById("occBeamsValue");
+    this.sensorNoise = document.getElementById("occSensorNoise");
+    this.sensorNoiseValue = document.getElementById("occSensorNoiseValue");
+    this.maxRange = document.getElementById("occRange");
+    this.maxRangeValue = document.getElementById("occRangeValue");
+    this.playPause = document.getElementById("occPlayPause");
+    this.resetBtn = document.getElementById("occReset");
+
+    this.gridW = 28;
+    this.gridH = 20;
+    this.truth = this.createTruthGrid();
+    this.running = true;
+    this.bindEvents();
+    this.reset();
+  }
+
+  bindEvents() {
+    this.beams.addEventListener("input", () => {
+      this.beamsValue.textContent = `${Number(this.beams.value)}`;
+    });
+    this.sensorNoise.addEventListener("input", () => {
+      this.sensorNoiseValue.textContent = Number(this.sensorNoise.value).toFixed(2);
+    });
+    this.maxRange.addEventListener("input", () => {
+      this.maxRangeValue.textContent = Number(this.maxRange.value).toFixed(1);
+    });
+    this.playPause.addEventListener("click", () => {
+      this.running = !this.running;
+      this.playPause.textContent = this.running ? "Pause" : "Play";
+    });
+    this.resetBtn.addEventListener("click", () => this.reset());
+  }
+
+  createTruthGrid() {
+    const map = Array.from({ length: this.gridH }, () => Array(this.gridW).fill(false));
+    const addRect = (x0, y0, x1, y1) => {
+      for (let y = y0; y <= y1; y += 1) {
+        for (let x = x0; x <= x1; x += 1) {
+          if (x >= 0 && x < this.gridW && y >= 0 && y < this.gridH) map[y][x] = true;
+        }
+      }
+    };
+
+    addRect(0, 0, this.gridW - 1, 0);
+    addRect(0, this.gridH - 1, this.gridW - 1, this.gridH - 1);
+    addRect(0, 0, 0, this.gridH - 1);
+    addRect(this.gridW - 1, 0, this.gridW - 1, this.gridH - 1);
+
+    addRect(8, 3, 8, 15);
+    addRect(19, 4, 19, 16);
+    addRect(12, 13, 15, 15);
+    addRect(4, 5, 6, 7);
+    addRect(22, 10, 24, 12);
+
+    // Doorway openings
+    map[9][8] = false;
+    map[10][8] = false;
+    map[7][19] = false;
+    map[8][19] = false;
+
+    return map;
+  }
+
+  reset() {
+    this.beams.value = "18";
+    this.sensorNoise.value = "0.8";
+    this.maxRange.value = "9";
+    this.beamsValue.textContent = "18";
+    this.sensorNoiseValue.textContent = "0.80";
+    this.maxRangeValue.textContent = "9.0";
+
+    this.running = true;
+    this.playPause.textContent = "Pause";
+    this.t = 0;
+    this.scanCount = 0;
+    this.pose = this.getPose(0);
+    this.beamEndpoints = [];
+    this.logOdds = Array.from({ length: this.gridH }, () => Array(this.gridW).fill(0));
+  }
+
+  getPose(t) {
+    const x = 14 + 8 * Math.cos(0.42 * t) + 1.8 * Math.cos(1.1 * t + 0.2);
+    const y = 10 + 6 * Math.sin(0.36 * t) + 1.4 * Math.sin(1.3 * t);
+    const dx = -8 * 0.42 * Math.sin(0.42 * t) - 1.8 * 1.1 * Math.sin(1.1 * t + 0.2);
+    const dy = 6 * 0.36 * Math.cos(0.36 * t) + 1.4 * 1.3 * Math.cos(1.3 * t);
+    return {
+      x: clamp(x, 1.2, this.gridW - 1.2),
+      y: clamp(y, 1.2, this.gridH - 1.2),
+      theta: Math.atan2(dy, dx),
+    };
+  }
+
+  inBounds(cx, cy) {
+    return cx >= 0 && cy >= 0 && cx < this.gridW && cy < this.gridH;
+  }
+
+  castRay(pose, angle, maxRange) {
+    const free = [];
+    let hit = null;
+    let endX = pose.x;
+    let endY = pose.y;
+    let lastKey = "";
+
+    for (let r = 0.2; r <= maxRange; r += 0.2) {
+      const wx = pose.x + r * Math.cos(angle);
+      const wy = pose.y + r * Math.sin(angle);
+      const cx = Math.floor(wx);
+      const cy = Math.floor(wy);
+      endX = wx;
+      endY = wy;
+
+      if (!this.inBounds(cx, cy)) break;
+
+      const key = `${cx}:${cy}`;
+      if (this.truth[cy][cx]) {
+        hit = { cx, cy };
+        break;
+      }
+
+      if (key !== lastKey) {
+        free.push({ cx, cy });
+        lastKey = key;
+      }
+    }
+
+    return { free, hit, endX, endY };
+  }
+
+  performScan() {
+    const noise = Number(this.sensorNoise.value);
+    const beamCount = Number(this.beams.value);
+    const maxRange = Number(this.maxRange.value);
+    const occUpdate = 0.46 / (1 + noise * 0.7);
+    const freeUpdate = 0.16 / (1 + noise * 0.6);
+    const beams = [];
+
+    for (let i = 0; i < beamCount; i += 1) {
+      const rel = -1.2 + (2.4 * i) / Math.max(1, beamCount - 1);
+      const angle = this.pose.theta + rel + randn() * noise * 0.01;
+      const ray = this.castRay(this.pose, angle, maxRange);
+      beams.push(ray);
+
+      for (const c of ray.free) {
+        if (!this.inBounds(c.cx, c.cy)) continue;
+        this.logOdds[c.cy][c.cx] = clamp(this.logOdds[c.cy][c.cx] - freeUpdate, -3.5, 3.5);
+      }
+
+      if (ray.hit && Math.random() > noise * 0.08) {
+        this.logOdds[ray.hit.cy][ray.hit.cx] = clamp(this.logOdds[ray.hit.cy][ray.hit.cx] + occUpdate, -3.5, 3.5);
+      }
+    }
+
+    this.beamEndpoints = beams;
+    this.scanCount += 1;
+  }
+
+  step(dt) {
+    if (this.running) {
+      const nextPose = this.getPose(this.t + dt * 1.1);
+      const cx = Math.floor(nextPose.x);
+      const cy = Math.floor(nextPose.y);
+      if (!this.truth[cy][cx]) {
+        this.t += dt * 1.1;
+        this.pose = nextPose;
+      } else {
+        this.t += dt * 0.25;
+      }
+
+      this.performScan();
+    }
+
+    this.draw();
+  }
+
+  drawGridPanel(panel, mode) {
+    const { x, y, size } = panel;
+    const ctx = this.ctx;
+    const cell = size;
+
+    for (let cy = 0; cy < this.gridH; cy += 1) {
+      for (let cx = 0; cx < this.gridW; cx += 1) {
+        const px = x + cx * cell;
+        const py = y + (this.gridH - cy - 1) * cell;
+        if (mode === "truth") {
+          ctx.fillStyle = this.truth[cy][cx] ? "#1f2e3a" : "#f9fcff";
+        } else {
+          const p = logistic(this.logOdds[cy][cx]);
+          const shade = Math.round(255 * (1 - p));
+          ctx.fillStyle = `rgb(${shade}, ${shade}, ${shade})`;
+        }
+        ctx.fillRect(px, py, cell, cell);
+      }
+    }
+
+    ctx.strokeStyle = "rgba(110,130,145,0.45)";
+    ctx.strokeRect(x, y, this.gridW * cell, this.gridH * cell);
+  }
+
+  drawRobotOnPanel(panel, color) {
+    const ctx = this.ctx;
+    const { x, y, size } = panel;
+    const px = x + this.pose.x * size;
+    const py = y + (this.gridH - this.pose.y) * size;
+    const len = 9;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(px, py, 4.4, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(px + Math.cos(this.pose.theta) * len, py - Math.sin(this.pose.theta) * len);
+    ctx.stroke();
+  }
+
+  mapStats() {
+    let known = 0;
+    let correct = 0;
+    let entropySum = 0;
+    for (let cy = 0; cy < this.gridH; cy += 1) {
+      for (let cx = 0; cx < this.gridW; cx += 1) {
+        const p = logistic(this.logOdds[cy][cx]);
+        const entropy = -(p * Math.log2(Math.max(1e-8, p)) + (1 - p) * Math.log2(Math.max(1e-8, 1 - p)));
+        entropySum += entropy;
+        if (Math.abs(p - 0.5) > 0.2) {
+          known += 1;
+          const estOcc = p > 0.5;
+          if (estOcc === this.truth[cy][cx]) correct += 1;
+        }
+      }
+    }
+
+    return {
+      known,
+      accuracy: known > 0 ? correct / known : 0,
+      meanEntropy: entropySum / (this.gridW * this.gridH),
+    };
+  }
+
+  draw() {
+    const ctx = this.ctx;
+    const canvas = this.canvas;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#fbfdff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const top = 46;
+    const sidePad = 30;
+    const gap = 28;
+    const size = Math.min((canvas.width - sidePad * 2 - gap) / (this.gridW * 2), (canvas.height - 84) / this.gridH);
+    const leftPanel = { x: sidePad, y: top, size };
+    const rightPanel = { x: sidePad + this.gridW * size + gap, y: top, size };
+
+    this.drawGridPanel(leftPanel, "estimate");
+    this.drawGridPanel(rightPanel, "truth");
+
+    ctx.fillStyle = "#2f4353";
+    ctx.font = "12px IBM Plex Mono";
+    ctx.fillText("Estimated occupancy", leftPanel.x, top - 10);
+    ctx.fillText("Hidden ground truth + rays", rightPanel.x, top - 10);
+
+    ctx.strokeStyle = "rgba(161,112,52,0.28)";
+    ctx.lineWidth = 1;
+    for (const beam of this.beamEndpoints) {
+      const sx = rightPanel.x + this.pose.x * size;
+      const sy = rightPanel.y + (this.gridH - this.pose.y) * size;
+      const ex = rightPanel.x + beam.endX * size;
+      const ey = rightPanel.y + (this.gridH - beam.endY) * size;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+    }
+
+    this.drawRobotOnPanel(leftPanel, THEME.correctedPath);
+    this.drawRobotOnPanel(rightPanel, THEME.odomPath);
+
+    const stats = this.mapStats();
+    this.readout.textContent =
+      `Scans integrated: ${this.scanCount}\n` +
+      `Confident cells: ${stats.known}/${this.gridW * this.gridH}\n` +
+      `Accuracy on confident cells: ${(stats.accuracy * 100).toFixed(1)}%\n` +
+      `Mean map entropy: ${stats.meanEntropy.toFixed(3)} bits\n` +
+      `Left map converges as free/occupied evidence accumulates.`;
+  }
+}
+
 class KinematicSlamDemo {
   constructor() {
     this.canvas = document.getElementById("kinematicCanvas");
@@ -1071,186 +1833,17 @@ class KinematicSlamDemo {
   }
 }
 
-class CourseController {
-  constructor() {
-    this.storageKey = "slam-course-progress-v1";
-    this.lessons = Array.from(document.querySelectorAll(".lesson"));
-    this.lessonIds = this.lessons.map((lesson) => lesson.id);
-    this.totalLessons = this.lessonIds.length;
-
-    this.progressCount = document.getElementById("courseProgressCount");
-    this.progressFill = document.getElementById("courseProgressFill");
-    this.progressText = document.getElementById("courseProgressText");
-    this.completeCard = document.getElementById("courseCompleteCard");
-
-    this.statusNodes = new Map();
-    for (const node of document.querySelectorAll("[data-step-status]")) {
-      this.statusNodes.set(node.dataset.stepStatus, node);
-    }
-
-    this.navLinks = Array.from(document.querySelectorAll(".lesson-nav-link"));
-    this.completed = this.loadProgress();
-
-    this.bind();
-    this.observeActiveLesson();
-    this.updateProgressUI();
-  }
-
-  loadProgress() {
-    try {
-      const raw = localStorage.getItem(this.storageKey);
-      if (!raw) return new Set();
-      const parsed = JSON.parse(raw);
-      const valid = parsed.filter((id) => this.lessonIds.includes(id));
-      return new Set(valid);
-    } catch {
-      return new Set();
-    }
-  }
-
-  saveProgress() {
-    try {
-      localStorage.setItem(this.storageKey, JSON.stringify([...this.completed]));
-    } catch {
-      // Ignore storage errors in restricted environments.
-    }
-  }
-
-  bind() {
-    for (const button of document.querySelectorAll(".complete-step-btn")) {
-      button.addEventListener("click", () => {
-        this.markComplete(button.dataset.stepId);
-      });
-    }
-
-    for (const button of document.querySelectorAll(".quiz-check-btn")) {
-      button.addEventListener("click", () => {
-        this.checkQuiz(button);
-      });
-    }
-
-    const resetButton = document.getElementById("resetCourseBtn");
-    if (resetButton) {
-      resetButton.addEventListener("click", () => this.resetProgress());
-    }
-  }
-
-  observeActiveLesson() {
-    if (typeof IntersectionObserver === "undefined") return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        let candidate = null;
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          if (!candidate || entry.intersectionRatio > candidate.intersectionRatio) {
-            candidate = entry;
-          }
-        }
-        if (!candidate) return;
-        this.setActiveNav(candidate.target.id);
-      },
-      { threshold: [0.35, 0.6, 0.9] },
-    );
-
-    for (const lesson of this.lessons) {
-      observer.observe(lesson);
-    }
-  }
-
-  setActiveNav(stepId) {
-    for (const link of this.navLinks) {
-      link.classList.toggle("is-active", link.dataset.stepTarget === stepId);
-    }
-  }
-
-  markComplete(stepId) {
-    if (!this.lessonIds.includes(stepId)) return;
-    this.completed.add(stepId);
-    this.saveProgress();
-    this.updateProgressUI();
-  }
-
-  checkQuiz(button) {
-    const quizName = button.dataset.quiz;
-    const correct = button.dataset.correct;
-    const stepId = button.dataset.stepId;
-    const feedback = document.querySelector(`[data-quiz-feedback=\"${quizName}\"]`);
-    if (!feedback) return;
-
-    const selected = document.querySelector(`input[name=\"${quizName}\"]:checked`);
-    feedback.classList.remove("is-correct", "is-wrong");
-
-    if (!selected) {
-      feedback.textContent = "Select an answer first.";
-      feedback.classList.add("is-wrong");
-      return;
-    }
-
-    if (selected.value === correct) {
-      feedback.textContent = "Correct. Lesson marked complete.";
-      feedback.classList.add("is-correct");
-      this.markComplete(stepId);
-      return;
-    }
-
-    feedback.textContent = "Not quite. Try again after interacting with the demo.";
-    feedback.classList.add("is-wrong");
-  }
-
-  resetProgress() {
-    this.completed.clear();
-    this.saveProgress();
-
-    for (const radio of document.querySelectorAll(".quiz-box input[type=\"radio\"]")) {
-      radio.checked = false;
-    }
-    for (const feedback of document.querySelectorAll(".quiz-feedback")) {
-      feedback.textContent = "";
-      feedback.classList.remove("is-correct", "is-wrong");
-    }
-
-    this.updateProgressUI();
-  }
-
-  updateProgressUI() {
-    const completedCount = this.completed.size;
-    const percent = this.totalLessons > 0 ? (completedCount / this.totalLessons) * 100 : 0;
-
-    this.progressCount.textContent = `${completedCount} / ${this.totalLessons} lessons complete`;
-    this.progressFill.style.width = `${percent}%`;
-
-    const firstIncomplete = this.lessonIds.find((id) => !this.completed.has(id));
-    this.progressText.textContent = firstIncomplete
-      ? `Next up: ${this.lessonTitle(firstIncomplete)}`
-      : "All lessons complete. Review any lesson to reinforce intuition.";
-
-    for (const [stepId, statusNode] of this.statusNodes.entries()) {
-      const done = this.completed.has(stepId);
-      statusNode.textContent = done ? "Completed" : "Not completed";
-      statusNode.classList.toggle("is-complete", done);
-    }
-
-    for (const link of this.navLinks) {
-      const stepId = link.dataset.stepTarget;
-      link.classList.toggle("is-complete", this.completed.has(stepId));
-    }
-
-    if (this.completeCard) {
-      this.completeCard.hidden = completedCount !== this.totalLessons;
-    }
-  }
-
-  lessonTitle(stepId) {
-    const lesson = document.getElementById(stepId);
-    const titleNode = lesson ? lesson.querySelector("h2") : null;
-    return titleNode ? titleNode.textContent : "Next lesson";
-  }
-}
-
 function init() {
-  const demos = [new OdometryDemo(), new CorrectionDemo(), new SlamDemo(), new KinematicSlamDemo()];
-  new CourseController();
+  const demos = [
+    new FrameTransformDemo(),
+    new OdometryDemo(),
+    new BayesianUpdateDemo(),
+    new CorrectionDemo(),
+    new DataAssociationDemo(),
+    new SlamDemo(),
+    new OccupancyGridDemo(),
+    new KinematicSlamDemo(),
+  ];
   let last = performance.now();
 
   const animate = (now) => {
