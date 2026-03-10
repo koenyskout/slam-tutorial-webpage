@@ -1,4 +1,17 @@
 const TAU = Math.PI * 2;
+const THEME = {
+  truePath: "#2f668e",
+  odomPath: "#a17034",
+  correctedPath: "#2d8377",
+  landmark: "#5f86a5",
+  map: "#2d8377",
+  gridMinor: "rgba(125, 145, 162, 0.22)",
+  gridMajor: "rgba(104, 126, 145, 0.46)",
+  ray: "rgba(161, 112, 52, 0.26)",
+  link: "rgba(161, 112, 52, 0.45)",
+  truthHintPath: "rgba(47, 102, 142, 0.46)",
+  truthHintRobot: "rgba(47, 102, 142, 0.62)",
+};
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -75,7 +88,7 @@ function getMapper(canvas) {
 function drawGrid(ctx, canvas, mapper) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  ctx.strokeStyle = "rgba(255,255,255,0.09)";
+  ctx.strokeStyle = THEME.gridMinor;
   ctx.lineWidth = 1;
 
   for (let v = 0; v <= 100; v += 10) {
@@ -93,7 +106,7 @@ function drawGrid(ctx, canvas, mapper) {
     ctx.stroke();
   }
 
-  ctx.strokeStyle = "rgba(255,255,255,0.22)";
+  ctx.strokeStyle = THEME.gridMajor;
   ctx.beginPath();
   ctx.moveTo(mapper.toX(0), mapper.toY(0));
   ctx.lineTo(mapper.toX(100), mapper.toY(0));
@@ -266,9 +279,9 @@ class OdometryDemo {
 
   drawLegend(mapper) {
     this.ctx.font = "12px IBM Plex Mono";
-    this.ctx.fillStyle = "#67d2ff";
+    this.ctx.fillStyle = THEME.truePath;
     this.ctx.fillText("True path", mapper.toX(2), mapper.toY(98));
-    this.ctx.fillStyle = "#ffc66d";
+    this.ctx.fillStyle = THEME.odomPath;
     this.ctx.fillText("Odometry estimate", mapper.toX(2), mapper.toY(94));
   }
 
@@ -276,10 +289,10 @@ class OdometryDemo {
     const mapper = getMapper(this.canvas);
     drawGrid(this.ctx, this.canvas, mapper);
 
-    drawPath(this.ctx, mapper, this.truePath, "#67d2ff", 2.3);
-    drawPath(this.ctx, mapper, this.estPath, "#ffc66d", 2.3);
+    drawPath(this.ctx, mapper, this.truePath, THEME.truePath, 2.3);
+    drawPath(this.ctx, mapper, this.estPath, THEME.odomPath, 2.3);
 
-    this.ctx.strokeStyle = "rgba(255, 184, 109, 0.5)";
+    this.ctx.strokeStyle = THEME.link;
     this.ctx.setLineDash([6, 6]);
     this.ctx.beginPath();
     this.ctx.moveTo(mapper.toX(this.truePose.x), mapper.toY(this.truePose.y));
@@ -287,8 +300,8 @@ class OdometryDemo {
     this.ctx.stroke();
     this.ctx.setLineDash([]);
 
-    drawRobot(this.ctx, mapper, this.truePose, "#67d2ff", "true");
-    drawRobot(this.ctx, mapper, this.estPose, "#ffc66d", "odom");
+    drawRobot(this.ctx, mapper, this.truePose, THEME.truePath, "true");
+    drawRobot(this.ctx, mapper, this.estPose, THEME.odomPath, "odom");
     this.drawLegend(mapper);
 
     this.readout.textContent =
@@ -442,7 +455,7 @@ class CorrectionDemo {
   }
 
   drawLandmarks(mapper) {
-    this.ctx.fillStyle = "rgba(121, 194, 230, 0.9)";
+    this.ctx.fillStyle = THEME.landmark;
     this.ctx.font = "10px IBM Plex Mono";
 
     for (const lm of this.landmarks) {
@@ -456,7 +469,7 @@ class CorrectionDemo {
   }
 
   drawVisibleRays(mapper) {
-    this.ctx.strokeStyle = "rgba(255, 143, 123, 0.33)";
+    this.ctx.strokeStyle = THEME.ray;
     this.ctx.lineWidth = 1.2;
 
     for (const obs of this.visible) {
@@ -474,13 +487,13 @@ class CorrectionDemo {
     this.drawLandmarks(mapper);
     this.drawVisibleRays(mapper);
 
-    drawPath(this.ctx, mapper, this.truePath, "#67d2ff", 2.1);
-    drawPath(this.ctx, mapper, this.odomPath, "#ffc66d", 2.1, [7, 5]);
-    drawPath(this.ctx, mapper, this.correctedPath, "#75f7d8", 2.4);
+    drawPath(this.ctx, mapper, this.truePath, THEME.truePath, 2.1);
+    drawPath(this.ctx, mapper, this.odomPath, THEME.odomPath, 2.1, [7, 5]);
+    drawPath(this.ctx, mapper, this.correctedPath, THEME.correctedPath, 2.4);
 
-    drawRobot(this.ctx, mapper, this.truePose, "#67d2ff", "true");
-    drawRobot(this.ctx, mapper, this.odomPose, "#ffc66d", "odom");
-    drawRobot(this.ctx, mapper, this.correctedPose, "#75f7d8", "corrected");
+    drawRobot(this.ctx, mapper, this.truePose, THEME.truePath, "true");
+    drawRobot(this.ctx, mapper, this.odomPose, THEME.odomPath, "odom");
+    drawRobot(this.ctx, mapper, this.correctedPose, THEME.correctedPath, "corrected");
 
     const odomErr = Math.hypot(this.truePose.x - this.odomPose.x, this.truePose.y - this.odomPose.y);
     const correctedErr = Math.hypot(this.truePose.x - this.correctedPose.x, this.truePose.y - this.correctedPose.y);
@@ -645,13 +658,13 @@ class SlamDemo {
       const radius = lm.sigma * mapper.scale;
       const intensity = clamp(lm.count / 9, 0.2, 1);
 
-      this.ctx.strokeStyle = `rgba(117,247,216,${0.12 + intensity * 0.24})`;
+      this.ctx.strokeStyle = `rgba(45,131,119,${0.12 + intensity * 0.24})`;
       this.ctx.lineWidth = 1.2;
       this.ctx.beginPath();
       this.ctx.arc(x, y, radius, 0, TAU);
       this.ctx.stroke();
 
-      this.ctx.fillStyle = `rgba(117,247,216,${0.4 + intensity * 0.55})`;
+      this.ctx.fillStyle = `rgba(45,131,119,${0.4 + intensity * 0.55})`;
       this.ctx.beginPath();
       this.ctx.arc(x, y, 2.8, 0, TAU);
       this.ctx.fill();
@@ -659,7 +672,7 @@ class SlamDemo {
   }
 
   drawTruthLandmarks(mapper) {
-    this.ctx.fillStyle = "rgba(179, 212, 231, 0.32)";
+    this.ctx.fillStyle = "rgba(95, 134, 165, 0.32)";
     for (const lm of this.trueLandmarks) {
       this.ctx.beginPath();
       this.ctx.arc(mapper.toX(lm.x), mapper.toY(lm.y), 2.2, 0, TAU);
@@ -668,7 +681,7 @@ class SlamDemo {
   }
 
   drawVisibleHints(mapper) {
-    this.ctx.strokeStyle = "rgba(255, 143, 123, 0.22)";
+    this.ctx.strokeStyle = THEME.ray;
     this.ctx.lineWidth = 1;
     for (const obs of this.visible) {
       const lm = this.map.get(obs.id);
@@ -698,14 +711,14 @@ class SlamDemo {
 
     if (this.showTruth.checked) {
       this.drawTruthLandmarks(mapper);
-      drawPath(this.ctx, mapper, this.truePath, "rgba(103,210,255,0.58)", 1.8);
-      drawRobot(this.ctx, mapper, this.truePose, "rgba(103,210,255,0.78)", "true");
+      drawPath(this.ctx, mapper, this.truePath, THEME.truthHintPath, 1.8);
+      drawRobot(this.ctx, mapper, this.truePose, THEME.truthHintRobot, "true");
     }
 
     this.drawMap(mapper);
     this.drawVisibleHints(mapper);
-    drawPath(this.ctx, mapper, this.estPath, "#ffc66d", 2.35);
-    drawRobot(this.ctx, mapper, this.estPose, "#ffc66d", "estimate");
+    drawPath(this.ctx, mapper, this.estPath, THEME.odomPath, 2.35);
+    drawRobot(this.ctx, mapper, this.estPose, THEME.odomPath, "estimate");
 
     const poseErr = Math.hypot(this.truePose.x - this.estPose.x, this.truePose.y - this.estPose.y);
     const mapped = this.map.size;
