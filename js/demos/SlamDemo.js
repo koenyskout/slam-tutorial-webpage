@@ -21,7 +21,7 @@ export class SlamDemo {
     this.resetBtn = document.getElementById("slamReset");
 
     this.trueLandmarks = makeLandmarks(26, 7);
-    this.running = true;
+    this.running = false;
     this.reset();
     this.bindEvents();
   }
@@ -47,8 +47,8 @@ export class SlamDemo {
 
   reset() {
     this.t = 0;
-    this.running = true;
-    this.playPause.textContent = "Pause";
+    this.running = false;
+    this.playPause.textContent = "Play";
 
     const p = modelC(0);
     this.truePose = p;

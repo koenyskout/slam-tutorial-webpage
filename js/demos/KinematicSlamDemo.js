@@ -25,7 +25,7 @@ export class KinematicSlamDemo {
 
     this.trueLandmarks = makeLandmarks(24, 83);
     this.landmarkById = new Map(this.trueLandmarks.map((lm) => [lm.id, lm]));
-    this.running = true;
+    this.running = false;
     this.reset();
     this.bindEvents();
   }
@@ -54,8 +54,8 @@ export class KinematicSlamDemo {
 
   reset() {
     this.t = 0;
-    this.running = true;
-    this.playPause.textContent = "Pause";
+    this.running = false;
+    this.playPause.textContent = "Play";
 
     const p = modelB(0);
     this.truePose = p;

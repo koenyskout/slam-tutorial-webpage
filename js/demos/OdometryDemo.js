@@ -16,7 +16,7 @@ export class OdometryDemo {
     this.playPause = document.getElementById("odomPlayPause");
     this.resetBtn = document.getElementById("odomReset");
 
-    this.running = true;
+    this.running = false;
     this.reset();
     this.bindEvents();
   }
@@ -42,8 +42,8 @@ export class OdometryDemo {
 
   reset() {
     this.t = 0;
-    this.running = true;
-    this.playPause.textContent = "Pause";
+    this.running = false;
+    this.playPause.textContent = "Play";
 
     this.truePose = modelA(0);
     this.estPose = { ...this.truePose };

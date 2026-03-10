@@ -19,7 +19,7 @@ export class CorrectionDemo {
     this.resetBtn = document.getElementById("corrReset");
 
     this.landmarks = makeLandmarks(16, 42);
-    this.running = true;
+    this.running = false;
     this.reset();
     this.bindEvents();
   }
@@ -45,8 +45,8 @@ export class CorrectionDemo {
 
   reset() {
     this.t = 0;
-    this.running = true;
-    this.playPause.textContent = "Pause";
+    this.running = false;
+    this.playPause.textContent = "Play";
 
     const p = modelB(0);
     this.truePose = p;

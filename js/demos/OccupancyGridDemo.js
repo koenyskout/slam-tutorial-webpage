@@ -19,7 +19,7 @@ export class OccupancyGridDemo {
     this.gridW = 28;
     this.gridH = 20;
     this.truth = this.createTruthGrid();
-    this.running = true;
+    this.running = false;
     this.bindEvents();
     this.reset();
   }
@@ -79,8 +79,8 @@ export class OccupancyGridDemo {
     this.sensorNoiseValue.textContent = "0.80";
     this.maxRangeValue.textContent = "9.0";
 
-    this.running = true;
-    this.playPause.textContent = "Pause";
+    this.running = false;
+    this.playPause.textContent = "Play";
     this.scanCount = 0;
     this.collisionAvoids = 0;
     this.explorationComplete = false;

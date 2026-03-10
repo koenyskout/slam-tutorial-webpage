@@ -19,7 +19,7 @@ export class DataAssociationDemo {
     this.landmarks = [];
     this.dragTarget = null;
     this.noise = 1;
-    this.running = true;
+    this.running = false;
     this.bindEvents();
     this.reset();
   }
@@ -90,8 +90,8 @@ export class DataAssociationDemo {
   reset() {
     this.noise = 1;
     this.noiseValue.textContent = "1.00";
-    this.running = true;
-    this.playPause.textContent = "Pause";
+    this.running = false;
+    this.playPause.textContent = "Play";
     this.timer = 0;
     this.totalSamples = 0;
     this.wrongSamples = 0;
