@@ -45,6 +45,7 @@
       <nav class="textbook-nav" aria-label="Chapter sections">
         <h2>Chapter Outline</h2>
         <ol>
+          <li><a href="#pipeline-story">The SLAM Recursion: Predict, Correct, Repeat</a></li>
           <li><a href="#frames-story">State, Frames, and Coordinate Transforms</a></li>
           <li><a href="#odometry-story">Prediction from Odometry</a></li>
           <li><a href="#bayes-story">Probabilistic Fusion (Bayesian / Kalman Intuition)</a></li>
@@ -55,6 +56,31 @@
           <li><a href="#kinematic-story">Kinematic Constraints and Smooth Corrections</a></li>
         </ol>
       </nav>
+
+      <section class="story" id="pipeline-story">
+        <div class="story-grid">
+          <div class="story-copy">
+            <p class="chapter-number">Overview</p>
+            <h2>The SLAM Recursion: Predict, Correct, Repeat</h2>
+            <p>
+              At each time step, SLAM combines a motion model (prediction) with sensor data (correction).
+              This repeats continuously while the robot moves. The result is a belief over both robot state and map.
+            </p>
+            <div class="equation-block">
+              \[
+              p(x_k,m \mid z_{1:k},u_{1:k})
+              \propto
+              p(z_k \mid x_k,m)
+              \int p(x_k \mid x_{k-1},u_k)\,p(x_{k-1},m \mid z_{1:k-1},u_{1:k-1})\,dx_{k-1}
+              \]
+            </div>
+            <p>
+              Sections 1-5 build intuition for each term in this recursion. Sections 6-8 combine them into
+              full online mapping and physically plausible state estimation.
+            </p>
+          </div>
+        </div>
+      </section>
 
       <section class="story" id="frames-story">
         <div class="story-grid">
@@ -308,6 +334,10 @@
               This joint posterior (trajectory \(x_{0:k}\) and map \(m\)) is the central SLAM object.
               The visualization uses a simplified online variant with landmark refinement and loop-closure-like corrections.
             </p>
+            <div class="note-block">
+              <strong>Modeling simplification.</strong> This teaching demo assumes known landmark identities after
+              association and uses lightweight correction rules instead of full sparse graph optimization or full EKF covariance propagation.
+            </div>
             <div class="readout" id="slamReadout"></div>
           </div>
 
@@ -325,13 +355,13 @@
                 <span id="slamSensorNoiseValue">0.80</span>
               </label>
               <label>
-                Loop-closure gain
+                Correction gain
                 <input id="slamGain" type="range" min="0" max="1" step="0.02" value="0.33" />
                 <span id="slamGainValue">0.33</span>
               </label>
               <label class="checkbox">
                 <input id="slamShowTruth" type="checkbox" />
-                Show hidden ground-truth landmarks and path
+                Show hidden ground-truth landmarks, path, and true pose
               </label>
               <div class="button-row">
                 <button id="slamPlayPause">Pause</button>
@@ -360,9 +390,16 @@
               \end{cases}
               \]
             </div>
+            <div class="equation-block">
+              \[
+              p_t(c)=\sigma(L_t(c))=\frac{1}{1+e^{-L_t(c)}}, \qquad
+              \mathcal{F}=\{c:\,L_t(c)<L_{free}\ \land\ \exists n\in\mathcal{N}(c)\text{ with }|L_t(n)|<\tau_{unk}\}
+              \]
+            </div>
             <p>
               Left panel: estimated occupancy from noisy beams. Right panel: hidden ground-truth environment.
-              Over time, repeated scans reduce uncertainty and reveal structure.
+              Over time, repeated scans reduce uncertainty and reveal structure. The planner drives toward
+              nearest reachable frontier cells (orange markers), then stops when no reachable frontier remains.
             </p>
             <div class="readout" id="occupancyReadout"></div>
           </div>

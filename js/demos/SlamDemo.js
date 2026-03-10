@@ -60,6 +60,19 @@ export class SlamDemo {
     this.map = new Map();
     this.visible = [];
     this.loopClosures = 0;
+    this.lastLoopClosureTime = -1e9;
+    this.loopClosureCooldown = 6;
+  }
+
+  updateLoopClosureCount(observations) {
+    if (observations.length < 3) return;
+    if (this.map.size < 8) return;
+    if (this.t - this.lastLoopClosureTime < this.loopClosureCooldown) return;
+    const backHome = Math.hypot(this.estPose.x - this.startPose.x, this.estPose.y - this.startPose.y);
+    if (backHome < 5.5) {
+      this.loopClosures += 1;
+      this.lastLoopClosureTime = this.t;
+    }
   }
 
   step(dt) {
@@ -130,12 +143,7 @@ export class SlamDemo {
       clampPose(this.estPose);
     }
 
-    if (this.t > 45 && observations.length > 2) {
-      const backHome = Math.hypot(this.estPose.x - this.startPose.x, this.estPose.y - this.startPose.y);
-      if (backHome < 7 && Math.random() < 0.02) {
-        this.loopClosures += 1;
-      }
-    }
+    this.updateLoopClosureCount(observations);
 
     this.truePath.push({ x: this.truePose.x, y: this.truePose.y });
     this.estPath.push({ x: this.estPose.x, y: this.estPose.y });
@@ -206,7 +214,8 @@ export class SlamDemo {
     const mapper = getMapper(this.canvas);
     drawGrid(this.ctx, this.canvas, mapper);
 
-    if (this.showTruth.checked) {
+    const showTruth = this.showTruth.checked;
+    if (showTruth) {
       this.drawTruthLandmarks(mapper);
       drawPath(this.ctx, mapper, this.truePath, THEME.truthHintPath, 1.8);
     }
@@ -216,20 +225,22 @@ export class SlamDemo {
     drawPath(this.ctx, mapper, this.estPath, THEME.odomPath, 2.35);
     drawRobot(this.ctx, mapper, this.estPose, THEME.odomPath, "estimate");
 
-    this.ctx.strokeStyle = THEME.truthGap;
-    this.ctx.lineWidth = 1.4;
-    this.ctx.setLineDash([5, 4]);
-    this.ctx.beginPath();
-    this.ctx.moveTo(mapper.toX(this.truePose.x), mapper.toY(this.truePose.y));
-    this.ctx.lineTo(mapper.toX(this.estPose.x), mapper.toY(this.estPose.y));
-    this.ctx.stroke();
-    this.ctx.setLineDash([]);
+    if (showTruth) {
+      this.ctx.strokeStyle = THEME.truthGap;
+      this.ctx.lineWidth = 1.4;
+      this.ctx.setLineDash([5, 4]);
+      this.ctx.beginPath();
+      this.ctx.moveTo(mapper.toX(this.truePose.x), mapper.toY(this.truePose.y));
+      this.ctx.lineTo(mapper.toX(this.estPose.x), mapper.toY(this.estPose.y));
+      this.ctx.stroke();
+      this.ctx.setLineDash([]);
 
-    this.ctx.fillStyle = THEME.truthHalo;
-    this.ctx.beginPath();
-    this.ctx.arc(mapper.toX(this.truePose.x), mapper.toY(this.truePose.y), 11, 0, TAU);
-    this.ctx.fill();
-    drawRobot(this.ctx, mapper, this.truePose, THEME.truePose, "true");
+      this.ctx.fillStyle = THEME.truthHalo;
+      this.ctx.beginPath();
+      this.ctx.arc(mapper.toX(this.truePose.x), mapper.toY(this.truePose.y), 11, 0, TAU);
+      this.ctx.fill();
+      drawRobot(this.ctx, mapper, this.truePose, THEME.truePose, "true");
+    }
 
     const poseErr = Math.hypot(this.truePose.x - this.estPose.x, this.truePose.y - this.estPose.y);
     const mapped = this.map.size;
@@ -239,6 +250,7 @@ export class SlamDemo {
       `Mapped landmarks: ${mapped}/${this.trueLandmarks.length}\n` +
       `Pose error (true vs estimate): ${poseErr.toFixed(2)} units\n` +
       `Mean landmark error: ${meanMapErr.toFixed(2)} units\n` +
-      `Loop closures detected: ${this.loopClosures}`;
+      `Loop closures detected: ${this.loopClosures}\n` +
+      `Truth overlay: ${showTruth ? "visible" : "hidden"}`;
   }
 }

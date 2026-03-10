@@ -73,6 +73,8 @@ export class KinematicSlamDemo {
     this.maxRawJump = 0;
     this.maxKinJump = 0;
     this.loopClosures = 0;
+    this.lastLoopClosureTime = -1e9;
+    this.loopClosureCooldown = 6;
   }
 
   observations(sensorNoise) {
@@ -106,6 +108,17 @@ export class KinematicSlamDemo {
     existing.count += 1;
     existing.sigma = Math.max(1.3, existing.sigma * 0.93);
     return existing;
+  }
+
+  updateLoopClosureCount(observations) {
+    if (observations.length < 3) return;
+    if (this.mapKin.size < 8) return;
+    if (this.t - this.lastLoopClosureTime < this.loopClosureCooldown) return;
+    const backHome = Math.hypot(this.kinPose.x - this.startPose.x, this.kinPose.y - this.startPose.y);
+    if (backHome < 5.5) {
+      this.loopClosures += 1;
+      this.lastLoopClosureTime = this.t;
+    }
   }
 
   step(dt) {
@@ -210,12 +223,7 @@ export class KinematicSlamDemo {
       clampPose(this.kinPose);
     }
 
-    if (this.t > 45 && observations.length > 2) {
-      const backHome = Math.hypot(this.kinPose.x - this.startPose.x, this.kinPose.y - this.startPose.y);
-      if (backHome < 7 && Math.random() < 0.02) {
-        this.loopClosures += 1;
-      }
-    }
+    this.updateLoopClosureCount(observations);
 
     this.rawJump = Math.hypot(this.rawPose.x - prevRaw.x, this.rawPose.y - prevRaw.y);
     this.kinJump = Math.hypot(this.kinPose.x - prevKin.x, this.kinPose.y - prevKin.y);

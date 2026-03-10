@@ -146,6 +146,14 @@ export class OccupancyGridDemo {
     return false;
   }
 
+  markCollisionEvidence(x, y) {
+    const cx = Math.floor(x);
+    const cy = Math.floor(y);
+    if (!this.inBounds(cx, cy)) return;
+    const reinforced = this.occupiedThreshold + 0.7;
+    this.logOdds[cy][cx] = Math.max(this.logOdds[cy][cx], reinforced);
+  }
+
   castRay(pose, angle, maxRange) {
     const free = [];
     let hit = null;
@@ -204,6 +212,7 @@ export class OccupancyGridDemo {
 
     this.beamEndpoints = beams;
     this.scanCount += 1;
+    this.refreshFrontierState();
   }
 
   isUnknown(cx, cy) {
@@ -332,6 +341,14 @@ export class OccupancyGridDemo {
     return cells.length;
   }
 
+  refreshFrontierState() {
+    this.frontierCount = this.countFrontiers();
+    const start = { x: Math.floor(this.pose.x), y: Math.floor(this.pose.y) };
+    const analysis = this.bfsNearestFrontierAnalysis(start);
+    this.reachableFrontierCount = analysis.reachableFrontiers;
+    return analysis;
+  }
+
   requestBoundaryPath(start) {
     let attempts = 0;
     while (attempts < this.boundaryGoals.length) {
@@ -351,9 +368,7 @@ export class OccupancyGridDemo {
 
   planPath() {
     const start = { x: Math.floor(this.pose.x), y: Math.floor(this.pose.y) };
-    this.frontierCount = this.countFrontiers();
-    const analysis = this.bfsNearestFrontierAnalysis(start);
-    this.reachableFrontierCount = analysis.reachableFrontiers;
+    const analysis = this.refreshFrontierState();
 
     const path = analysis.path;
     if (path && path.length > 1) {
@@ -414,6 +429,8 @@ export class OccupancyGridDemo {
 
       if (this.segmentCollides(this.pose.x, this.pose.y, nx, ny) || !this.isPoseFree(nx, ny)) {
         this.collisionAvoids += 1;
+        this.markCollisionEvidence(nx, ny);
+        this.refreshFrontierState();
         this.currentPath = [];
         this.pathIndex = 0;
         break;
