@@ -46,22 +46,41 @@
       </header>
 
       <nav class="textbook-nav" aria-label="Chapter sections">
-        <h2>Chapter Outline</h2>
+        <h2>Chapter Outline (Read In Order)</h2>
         <ol>
           <li><a href="#start-here">Start Here: What Problem SLAM Solves</a></li>
           <li><a href="#pipeline-story">The SLAM Recursion: Predict, Correct, Repeat</a></li>
+          <li class="outline-part">Part I - Foundations (Sections 1-4)</li>
           <li><a href="#frames-story">State, Frames, and Coordinate Transforms</a></li>
           <li><a href="#odometry-story">Prediction from Odometry</a></li>
           <li><a href="#covariance-story">Uncertainty as Covariance Ellipses (EKF Intuition)</a></li>
           <li><a href="#bayes-story">Probabilistic Fusion (Bayesian / Kalman Intuition)</a></li>
+          <li class="outline-part">Part II - Landmark SLAM Pipeline (Sections 5-8)</li>
           <li><a href="#correction-story">Measurement Update with Known Landmarks</a></li>
           <li><a href="#association-story">Data Association: Which Landmark Was Observed?</a></li>
           <li><a href="#slam-story">Online SLAM: Estimating Pose and Map Together</a></li>
           <li><a href="#posegraph-story">Pose Graphs and Loop Closure Optimization</a></li>
+          <li class="outline-part">Part III - Dense Mapping and Physical Constraints (Sections 9-10)</li>
           <li><a href="#occupancy-story">Occupancy Grid Mapping from Range Beams</a></li>
           <li><a href="#kinematic-story">Kinematic Constraints and Smooth Corrections</a></li>
         </ol>
       </nav>
+
+      <section class="story" id="chapter-roadmap">
+        <div class="story-grid">
+          <div class="story-copy">
+            <div class="guide-block">
+              <p class="guide-title">How The Story Builds (No Jumps)</p>
+              <ul class="guide-list">
+                <li>The bridge example runs one full update cycle before deep-diving into each component.</li>
+                <li>Part I builds core tools: coordinates, motion prediction, and uncertainty math.</li>
+                <li>Part II assembles those tools into landmark-SLAM: correction, association, then full coupling.</li>
+                <li>Part III switches map representation (occupancy grids) and adds motion realism constraints.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section class="story" id="start-here">
         <div class="story-grid">
@@ -84,7 +103,7 @@
               <p class="guide-title">How To Use This Chapter</p>
               <ul class="guide-list">
                 <li>Change one control at a time so cause and effect stay clear.</li>
-                <li>Watch both the picture and the readout; the readout names what changed.</li>
+                <li>Watch both the map and the on-canvas overlays; overlays name what changed.</li>
                 <li>When a result looks wrong, pause and drag controls back toward low noise.</li>
               </ul>
             </div>
@@ -114,7 +133,7 @@
               <strong>predict</strong> where the robot went, then <strong>correct</strong> that prediction with sensor data.
               Over time, this loop estimates both robot pose and map.
             </p>
-            <div class="equation-block" data-eq-viz="bayes-recursion">
+            <div class="equation-block">
               \[
               p(x_k,m \mid z_{1:k},u_{1:k})
               \propto
@@ -136,7 +155,7 @@
                 <li>\(m\): map state (landmarks or occupancy cells).</li>
               </ul>
             </div>
-            <div class="equation-block" data-eq-viz="ekf-cycle">
+            <div class="equation-block">
               \[
               \begin{aligned}
               \text{Predict: } & \hat{x}_k^- = f(\hat{x}_{k-1}, u_k), \quad P_k^- = F_k P_{k-1} F_k^\top + Q_k\\
@@ -150,6 +169,92 @@
               This is the EKF form of the same recursion. You do not need to memorize it immediately.
               Use it as a map: <em>motion model \(f\)</em>, <em>measurement model \(h\)</em>, and uncertainty matrices
               \(Q_k\), \(R_k\), \(P_k\).
+            </p>
+            <div class="note-block">
+              <strong>Next step.</strong> Run one complete cycle in the bridge example below, then we unpack each part in detail.
+            </div>
+            <p class="chapter-number">Bridge Example</p>
+            <h2>One Complete SLAM Update Cycle, Equation by Equation</h2>
+            <p>
+              Before we dive into each foundation topic in detail, run one concrete SLAM cycle end-to-end.
+              This example shows how the equations become an implementation and how that implementation moves
+              the estimate toward truth.
+            </p>
+            <div class="equation-block">
+              \[
+              \begin{aligned}
+              \text{(1) Predict state: }& \hat{x}_k^- = f(\hat{x}_{k-1}, u_k)\\
+              \text{(2) Predict covariance: }& P_k^- = F_k P_{k-1} F_k^\top + Q_k\\
+              \text{(3) Gain: }& K_k = P_k^- H_k^\top (H_k P_k^- H_k^\top + R_k)^{-1}\\
+              \text{(4) Correct: }& \hat{x}_k = \hat{x}_k^- + K_k\big(z_k - h(\hat{x}_k^-)\big)
+              \end{aligned}
+              \]
+            </div>
+            <div class="implementation-block">
+              <p class="guide-title">Reference Implementation (Used By The Visualization)</p>
+              <pre><code>const xPred = f(x, u);                     // Eq. (1)
+const PPred = F(x, u) @ P @ F(x, u).T + Q; // Eq. (2)
+const K = PPred @ H(xPred).T @ inv(H(xPred) @ PPred @ H(xPred).T + R); // Eq. (3)
+const xPost = xPred + K @ (z - h(xPred));  // Eq. (4)
+P = (I - K @ H(xPred)) @ PPred;</code></pre>
+            </div>
+            <div class="guide-block">
+              <p class="guide-title">How To Use This Figure</p>
+              <ul class="guide-list">
+                <li>Press `Next` (recommended): it alternates Predict then Correct in recursion order.</li>
+                <li>Use `Predict` or `Correct` only if you want to inspect one equation block in isolation.</li>
+                <li>Use `Step` for a full cycle \((1)\rightarrow(4)\) in one click.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="viz-panel" id="worked-example-story">
+            <canvas id="linkedExampleCanvas" width="960" height="560"></canvas>
+            <div class="controls">
+              <label>
+                Process noise (Q)
+                <input id="linkedProcNoise" type="range" min="0" max="2.0" step="0.05" value="0.70" />
+                <span id="linkedProcNoiseValue">0.70</span>
+              </label>
+              <label>
+                Measurement noise (R)
+                <input id="linkedMeasNoise" type="range" min="0" max="2.0" step="0.05" value="0.55" />
+                <span id="linkedMeasNoiseValue">0.55</span>
+              </label>
+              <label>
+                Control step \(\Delta s\)
+                <input id="linkedStepSize" type="range" min="0.8" max="4.0" step="0.1" value="2.20" />
+                <span id="linkedStepSizeValue">2.20</span>
+              </label>
+              <label>
+                Control turn \(\Delta \theta\)
+                <input id="linkedTurnRate" type="range" min="0.02" max="0.45" step="0.01" value="0.16" />
+                <span id="linkedTurnRateValue">0.16 rad</span>
+              </label>
+              <div class="button-row">
+                <button id="linkedNext">Next: Predict (1-2)</button>
+                <button id="linkedPredict">Predict (1-2)</button>
+                <button id="linkedCorrect">Correct (3-4)</button>
+                <button id="linkedStep">Full step (1-4)</button>
+                <button id="linkedReset" class="secondary">Reset</button>
+              </div>
+              <p class="control-help">
+                Blue = truth, orange = predicted \(x^-\), green = corrected belief \(x^+\).
+                Start with `Next` to follow recursion order. Overlays on the canvas show equation terms and errors.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="story part-banner" id="part-foundations">
+        <div class="story-grid">
+          <div class="story-copy">
+            <p class="chapter-number">Part I</p>
+            <h2>Foundations: Representation, Motion, and Uncertainty</h2>
+            <p>
+              Sections 1-4 build the mathematical core used by all SLAM variants:
+              coordinate transforms, motion prediction, covariance, and Bayesian fusion.
             </p>
           </div>
         </div>
@@ -169,7 +274,7 @@
               Sensors usually report points relative to the robot ("2 meters ahead"), not in map coordinates.
               This equation converts local sensor coordinates into world/map coordinates:
             </p>
-            <div class="equation-block" data-eq-viz="transform-2d">
+            <div class="equation-block">
               \[
               \begin{aligned}
               x_w &= x + p_x\cos\theta - p_y\sin\theta \\
@@ -181,6 +286,13 @@
               This transform is the base layer under almost every SLAM measurement update.
             </p>
             <div class="guide-block">
+              <p class="guide-title">Pipeline Role</p>
+              <ul class="guide-list">
+                <li>Input: robot pose plus sensor point in robot-local coordinates.</li>
+                <li>Output: map-frame coordinates that can be compared with landmarks or grid cells.</li>
+              </ul>
+            </div>
+            <div class="guide-block">
               <p class="guide-title">Try This In The Figure</p>
               <ul class="guide-list">
                 <li>Drag the heading handle while keeping robot position fixed.</li>
@@ -191,14 +303,16 @@
             <div class="note-block">
               <strong>Why this matters.</strong> Most SLAM errors are ultimately transform or frame-consistency errors.
             </div>
-            <div class="readout" id="framesReadout"></div>
+            <div class="note-block">
+              <strong>Next step.</strong> Once coordinates are consistent, we can model robot motion and predict where it went.
+            </div>
           </div>
 
           <div class="viz-panel">
             <canvas id="framesCanvas" width="960" height="560"></canvas>
             <div class="controls">
               <p class="control-help">
-                Drag robot body, heading handle, or transformed point. The readout updates both local and world coordinates.
+                Drag robot body, heading handle, or transformed point. Coordinates update directly on the figure.
               </p>
               <div class="button-row">
                 <button id="frameReset" class="secondary">Reset</button>
@@ -217,7 +331,7 @@
               Odometry is "where I think I moved" from wheel encoders or motion sensors.
               If the robot moves by \(\Delta s\) and turns by \(\Delta \theta\), one common update is:
             </p>
-            <div class="equation-block" data-eq-viz="odom-integration">
+            <div class="equation-block">
               \[
               \begin{aligned}
               x_k &= x_{k-1} + \Delta s \cos(\theta_{k-1}) \\
@@ -231,6 +345,13 @@
               The visualization shows how pure prediction gradually walks away from truth.
             </p>
             <div class="guide-block">
+              <p class="guide-title">Pipeline Role</p>
+              <ul class="guide-list">
+                <li>Input: previous pose estimate and odometry/control increment.</li>
+                <li>Output: predicted pose \( \hat{x}_k^- \), before any sensor correction.</li>
+              </ul>
+            </div>
+            <div class="guide-block">
               <p class="guide-title">Try This In The Figure</p>
               <ul class="guide-list">
                 <li>Set noise low and watch true and odometry paths stay close.</li>
@@ -241,7 +362,9 @@
             <div class="note-block">
               <strong>Core limitation.</strong> Prediction-only localization is unbounded in error over long trajectories.
             </div>
-            <div class="readout" id="odometryReadout"></div>
+            <div class="note-block">
+              <strong>Next step.</strong> To correct drift rigorously, we need a mathematical representation of uncertainty.
+            </div>
           </div>
 
           <div class="viz-panel">
@@ -280,7 +403,7 @@
               In 2D position, \( \Sigma \) becomes an ellipse: orientation shows correlated error,
               axis lengths show uncertainty magnitude.
             </p>
-            <div class="equation-block" data-eq-viz="gaussian-levelset">
+            <div class="equation-block">
               \[
               p(\mathbf{x}) = \mathcal{N}(\mathbf{x};\boldsymbol{\mu},\Sigma), \qquad
               (\mathbf{x}-\boldsymbol{\mu})^\top \Sigma^{-1} (\mathbf{x}-\boldsymbol{\mu}) = \chi^2_{2,\alpha}
@@ -289,7 +412,7 @@
             <p>
               EKF fusion in information form is:
             </p>
-            <div class="equation-block" data-eq-viz="info-fusion">
+            <div class="equation-block">
               \[
               \Sigma^+ = \left((\Sigma^-)^{-1} + R^{-1}\right)^{-1}, \qquad
               \boldsymbol{\mu}^+ = \Sigma^+ \left((\Sigma^-)^{-1}\boldsymbol{\mu}^- + R^{-1}\mathbf{z}\right)
@@ -300,6 +423,13 @@
               orange is measurement model \((\mathbf{z}, R)\), and green is fused posterior belief.
             </p>
             <div class="guide-block">
+              <p class="guide-title">Pipeline Role</p>
+              <ul class="guide-list">
+                <li>Input: prior mean/covariance and measurement mean/covariance.</li>
+                <li>Output: posterior mean/covariance with explicit confidence geometry.</li>
+              </ul>
+            </div>
+            <div class="guide-block">
               <p class="guide-title">Try This In The Figure</p>
               <ul class="guide-list">
                 <li>Drag blue/gray/orange means to create disagreement between truth, prediction, and measurement.</li>
@@ -307,7 +437,9 @@
                 <li>Rotate ellipses and watch how posterior orientation changes with anisotropic uncertainty.</li>
               </ul>
             </div>
-            <div class="readout" id="covarianceReadout"></div>
+            <div class="note-block">
+              <strong>Next step.</strong> Now we apply this fusion logic to a concrete nonlinear sensor model.
+            </div>
           </div>
 
           <div class="viz-panel">
@@ -340,7 +472,7 @@
               Orange shows where the robot could be according to that measurement (an annular sector),
               blue is ground truth, gray is prior belief, and green is the fused posterior.
             </p>
-            <div class="equation-block" data-eq-viz="bayes-product">
+            <div class="equation-block">
               \[
               p(\mathbf{x}\mid z,m) \propto p(z\mid \mathbf{x},m)\,p(\mathbf{x})
               \]
@@ -348,7 +480,7 @@
             <p>
               with likelihood
             </p>
-            <div class="equation-block" data-eq-viz="range-bearing">
+            <div class="equation-block">
               \[
               p(z\mid \mathbf{x},m)\propto
               \exp\!\left(
@@ -364,6 +496,13 @@
               more aggressively. Higher uncertainty broadens it, so prior dominates.
             </p>
             <div class="guide-block">
+              <p class="guide-title">Pipeline Role</p>
+              <ul class="guide-list">
+                <li>Input: prior belief and one measurement model around a landmark.</li>
+                <li>Output: updated posterior belief over robot pose.</li>
+              </ul>
+            </div>
+            <div class="guide-block">
               <p class="guide-title">Try This In The Figure</p>
               <ul class="guide-list">
                 <li>Drag the blue truth pose and landmark to move measurement geometry.</li>
@@ -371,7 +510,9 @@
                 <li>Tighten uncertainty and watch posterior collapse toward a smaller region.</li>
               </ul>
             </div>
-            <div class="readout" id="bayesReadout"></div>
+            <div class="note-block">
+              <strong>Next step.</strong> We now put this update into a running trajectory with repeated motion and observations.
+            </div>
           </div>
 
           <div class="viz-panel">
@@ -388,6 +529,19 @@
         </div>
       </section>
 
+      <section class="story part-banner" id="part-landmark-slam">
+        <div class="story-grid">
+          <div class="story-copy">
+            <p class="chapter-number">Part II</p>
+            <h2>Landmark SLAM Pipeline: Correct, Associate, Jointly Estimate</h2>
+            <p>
+              Sections 5-8 turn the foundations into a working landmark-SLAM system,
+              then reinterpret that system as a global optimization problem.
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section class="story" id="correction-story">
         <div class="story-grid">
           <div class="story-copy">
@@ -396,7 +550,7 @@
             <p>
               Here we assume landmark positions are known. The robot predicts motion, then corrects pose using landmark observations.
             </p>
-            <div class="equation-block" data-eq-viz="correction-gain">
+            <div class="equation-block">
               \[
               \begin{aligned}
               \hat{x}_k^- &= f(\hat{x}_{k-1}, u_k) \\
@@ -414,6 +568,13 @@
               Geometrically, landmark measurements pull the drifting estimate back toward plausible positions.
             </p>
             <div class="guide-block">
+              <p class="guide-title">Pipeline Role</p>
+              <ul class="guide-list">
+                <li>Input: predicted pose plus measurements to known landmarks.</li>
+                <li>Output: corrected pose after applying innovation-weighted update.</li>
+              </ul>
+            </div>
+            <div class="guide-block">
               <p class="guide-title">Try This In The Figure</p>
               <ul class="guide-list">
                 <li>Raise odometry noise and keep sensor noise low.</li>
@@ -424,7 +585,9 @@
             <div class="note-block">
               <strong>Tuning insight.</strong> Gain trades responsiveness for noise sensitivity.
             </div>
-            <div class="readout" id="correctionReadout"></div>
+            <div class="note-block">
+              <strong>Next step.</strong> This only works if each measurement is matched to the correct landmark.
+            </div>
           </div>
 
           <div class="viz-panel">
@@ -470,7 +633,7 @@
               This figure samples noisy readings from one true landmark and asks:
               which candidate landmark best explains this reading?
             </p>
-            <div class="equation-block" data-eq-viz="association-score">
+            <div class="equation-block">
               \[
               p(z\mid \ell_i) \propto \exp\left(-\frac{1}{2}\Big[\big(\tfrac{\Delta r_i}{\sigma_r}\big)^2 +
               \big(\tfrac{\Delta \phi_i}{\sigma_\phi}\big)^2\Big]\right)
@@ -481,6 +644,13 @@
               (nearest-neighbor, JCBB, or probabilistic assignment). This section shows the core likelihood mechanism
               behind those methods.
             </p>
+            <div class="guide-block">
+              <p class="guide-title">Pipeline Role</p>
+              <ul class="guide-list">
+                <li>Input: one noisy measurement and a set of candidate landmarks.</li>
+                <li>Output: association decision (which landmark ID to update).</li>
+              </ul>
+            </div>
             <div class="note-block">
               <strong>Failure mode.</strong> Wrong associations can corrupt both map and trajectory even when other components are correct.
             </div>
@@ -492,7 +662,9 @@
                 <li>Move landmarks farther apart and see probabilities separate again.</li>
               </ul>
             </div>
-            <div class="readout" id="associationReadout"></div>
+            <div class="note-block">
+              <strong>Next step.</strong> With prediction, correction, and association in place, we can run full online SLAM.
+            </div>
           </div>
 
           <div class="viz-panel">
@@ -525,12 +697,12 @@
               This is the full coupled problem: estimate robot pose and map landmarks at the same time.
               Better pose gives better map updates, and a better map gives better pose corrections.
             </p>
-            <div class="equation-block" data-eq-viz="joint-state">
+            <div class="equation-block">
               \[
               p(x_{0:k}, m \mid z_{1:k}, u_{1:k})
               \]
             </div>
-            <div class="equation-block" data-eq-viz="block-covariance">
+            <div class="equation-block">
               \[
               \mathbf{y}_k=
               \begin{bmatrix}
@@ -546,7 +718,7 @@
               \end{bmatrix}
               \]
             </div>
-            <div class="equation-block" data-eq-viz="factor-graph">
+            <div class="equation-block">
               \[
               p(x_{0:k},m \mid z_{1:k},u_{1:k}) \propto
               p(m)\,p(x_0)\,\prod_{t=1}^k p(x_t\mid x_{t-1},u_t)\,\prod_{t=1}^k p(z_t\mid x_t,m)
@@ -560,12 +732,19 @@
               The off-diagonal covariance blocks (\(P_{xm}, P_{mx}\)) encode robot-map correlations.
               Those correlations are why observing one landmark can improve many related estimates.
             </p>
+            <div class="guide-block">
+              <p class="guide-title">Pipeline Role</p>
+              <ul class="guide-list">
+                <li>Input: motion updates + associated landmark observations over time.</li>
+                <li>Output: jointly consistent pose estimate and landmark map estimate.</li>
+              </ul>
+            </div>
             <div class="note-block">
               <strong>Modeling simplification.</strong> This teaching demo assumes known landmark identities after
               association and uses lightweight correction rules instead of full sparse graph optimization or full EKF covariance propagation.
             </div>
             <div class="note-block">
-              <strong>About error numbers.</strong> Pose/map errors shown in the readout are evaluation metrics
+              <strong>About error numbers.</strong> Pose/map errors shown in the canvas overlays are evaluation metrics
               against hidden simulation truth. Real robots do not have this ground-truth stream online.
             </div>
             <div class="guide-block">
@@ -576,7 +755,9 @@
                 <li>Increase correction gain to recover, then raise sensor noise to see the trade-off.</li>
               </ul>
             </div>
-            <div class="readout" id="slamReadout"></div>
+            <div class="note-block">
+              <strong>Next step.</strong> We now switch from filter view to graph view of the same SLAM consistency problem.
+            </div>
           </div>
 
           <div class="viz-panel">
@@ -624,7 +805,7 @@
               Loop closure adds a long-range edge that says:
               "this late pose should be consistent with an earlier place."
             </p>
-            <div class="equation-block" data-eq-viz="pose-graph-cost">
+            <div class="equation-block">
               \[
               \mathbf{x}^\star = \arg\min_{\mathbf{x}}
               \sum_{(i,j)\in\mathcal{E}}
@@ -639,6 +820,13 @@
               In practice this is solved iteratively (Gauss-Newton, Levenberg-Marquardt, iSAM variants).
             </p>
             <div class="guide-block">
+              <p class="guide-title">Pipeline Role</p>
+              <ul class="guide-list">
+                <li>Input: a trajectory graph with odometry edges and loop-closure edges.</li>
+                <li>Output: globally optimized trajectory where accumulated drift is redistributed.</li>
+              </ul>
+            </div>
+            <div class="guide-block">
               <p class="guide-title">Try This In The Figure</p>
               <ul class="guide-list">
                 <li>Start optimization and watch green trajectory globally deform to satisfy closure.</li>
@@ -646,7 +834,9 @@
                 <li>Use single-step mode to see optimization as many tiny corrections, not one jump.</li>
               </ul>
             </div>
-            <div class="readout" id="poseGraphReadout"></div>
+            <div class="note-block">
+              <strong>Next step.</strong> So far the map was sparse landmarks. Next we switch to dense occupancy mapping.
+            </div>
           </div>
 
           <div class="viz-panel">
@@ -679,6 +869,19 @@
         </div>
       </section>
 
+      <section class="story part-banner" id="part-dense-mapping">
+        <div class="story-grid">
+          <div class="story-copy">
+            <p class="chapter-number">Part III</p>
+            <h2>Dense Mapping and Physical Realism</h2>
+            <p>
+              Sections 9-10 switch from sparse landmarks to occupancy grids, then add
+              kinematic constraints so the estimator remains physically plausible.
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section class="story" id="occupancy-story">
         <div class="story-grid">
           <div class="story-copy">
@@ -688,7 +891,7 @@
               Not all SLAM maps are sparse landmarks. A common alternative is occupancy grids, where each cell stores
               probability of being occupied. Range beams update free space along the ray and occupied space at the hit.
             </p>
-            <div class="equation-block" data-eq-viz="logodds-update">
+            <div class="equation-block">
               \[
               L_t(c) = L_{t-1}(c) +
               \begin{cases}
@@ -697,7 +900,7 @@
               \end{cases}
               \]
             </div>
-            <div class="equation-block" data-eq-viz="logistic-frontier">
+            <div class="equation-block">
               \[
               p_t(c)=\sigma(L_t(c))=\frac{1}{1+e^{-L_t(c)}}, \qquad
               \mathcal{F}_t=\left\{c\;\middle|\; L_t(c)\lt L_{\mathrm{free}},\;
@@ -711,6 +914,13 @@
               nearest reachable frontier cells (orange markers), then stops when no reachable frontier remains.
             </p>
             <div class="guide-block">
+              <p class="guide-title">Pipeline Role</p>
+              <ul class="guide-list">
+                <li>Input: repeated range beams along robot trajectory.</li>
+                <li>Output: probabilistic free/occupied grid map and frontier-driven exploration targets.</li>
+              </ul>
+            </div>
+            <div class="guide-block">
               <p class="guide-title">Try This In The Figure</p>
               <ul class="guide-list">
                 <li>Pause and inspect orange frontier dots: those are boundaries between known free space and unknown space.</li>
@@ -718,7 +928,9 @@
                 <li>Increase sensor noise and watch uncertainty remain gray for longer.</li>
               </ul>
             </div>
-            <div class="readout" id="occupancyReadout"></div>
+            <div class="note-block">
+              <strong>Next step.</strong> Final layer: enforce motion realism so corrections remain physically plausible.
+            </div>
           </div>
 
           <div class="viz-panel">
@@ -760,7 +972,7 @@
               Real robots cannot teleport or spin infinitely fast. So even during correction, state updates should
               obey motion limits.
             </p>
-            <div class="equation-block" data-eq-viz="kinematic-bounds">
+            <div class="equation-block">
               \[
               \dot{x}=v\cos\theta,\quad \dot{y}=v\sin\theta,\quad \dot{\theta}=\omega,\quad
               |\omega|\le \omega_{\max},\; |\dot{v}|\le a_{\max}
@@ -772,6 +984,13 @@
               map estimates. Compare jump metrics to see why motion priors improve physical plausibility.
             </p>
             <div class="guide-block">
+              <p class="guide-title">Pipeline Role</p>
+              <ul class="guide-list">
+                <li>Input: unconstrained correction proposal from estimator.</li>
+                <li>Output: kinematically feasible state update for real robot execution.</li>
+              </ul>
+            </div>
+            <div class="guide-block">
               <p class="guide-title">Try This In The Figure</p>
               <ul class="guide-list">
                 <li>Enable the raw baseline and compare raw vs kin jump metrics.</li>
@@ -779,7 +998,6 @@
                 <li>Increase correction gain and check whether kin stays close without large jump spikes.</li>
               </ul>
             </div>
-            <div class="readout" id="kinematicReadout"></div>
           </div>
 
           <div class="viz-panel">

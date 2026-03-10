@@ -1,6 +1,6 @@
 import { THEME } from "../core/constants.js";
 import { lerp, makeLandmarks, randn, wrapAngle } from "../core/math.js";
-import { clampPose, drawGrid, drawPath, drawRobot, getMapper } from "../core/canvas.js";
+import { clampPose, drawGrid, drawInfoPanel, drawPath, drawRobot, getMapper } from "../core/canvas.js";
 import { installPlayOverlay } from "../core/playOverlay.js";
 import { modelB } from "../core/models.js";
 
@@ -8,7 +8,6 @@ export class CorrectionDemo {
   constructor() {
     this.canvas = document.getElementById("correctionCanvas");
     this.ctx = this.canvas.getContext("2d");
-    this.readout = document.getElementById("correctionReadout");
 
     this.odomNoise = document.getElementById("corrOdomNoise");
     this.odomNoiseValue = document.getElementById("corrOdomNoiseValue");
@@ -206,10 +205,14 @@ export class CorrectionDemo {
     const odomErr = Math.hypot(this.truePose.x - this.odomPose.x, this.truePose.y - this.odomPose.y);
     const correctedErr = Math.hypot(this.truePose.x - this.correctedPose.x, this.truePose.y - this.correctedPose.y);
 
-    this.readout.textContent =
-      `Visible landmarks: ${this.visible.length}\n` +
-      `Odometry error: ${odomErr.toFixed(2)} units\n` +
-      `Corrected error: ${correctedErr.toFixed(2)} units\n` +
-      `Interpretation: landmark measurements pull the estimate back when odometry drifts.`;
+    drawInfoPanel(this.ctx, this.canvas, {
+      title: "Correction Effect",
+      lines: [
+        `visible landmarks: ${this.visible.length}`,
+        `odom error: ${odomErr.toFixed(2)} units`,
+        `corrected error: ${correctedErr.toFixed(2)} units`,
+        "Landmark updates pull drifted pose back.",
+      ],
+    });
   }
 }

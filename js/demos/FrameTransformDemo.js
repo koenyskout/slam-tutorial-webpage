@@ -1,12 +1,11 @@
 import { TAU, THEME } from "../core/constants.js";
 import { clamp } from "../core/math.js";
-import { drawGrid, drawRobot, getMapper } from "../core/canvas.js";
+import { drawGrid, drawInfoPanel, drawRobot, getMapper } from "../core/canvas.js";
 
 export class FrameTransformDemo {
   constructor() {
     this.canvas = document.getElementById("framesCanvas");
     this.ctx = this.canvas.getContext("2d");
-    this.readout = document.getElementById("framesReadout");
     this.resetBtn = document.getElementById("frameReset");
     this.dragMode = null;
 
@@ -105,6 +104,8 @@ export class FrameTransformDemo {
     const uy = Math.sin(this.robot.theta);
     const vx = -Math.sin(this.robot.theta);
     const vy = Math.cos(this.robot.theta);
+    const projX = rx + ux * lx;
+    const projY = ry + uy * lx;
 
     this.ctx.strokeStyle = "#4d7394";
     this.ctx.lineWidth = 2;
@@ -127,12 +128,38 @@ export class FrameTransformDemo {
     this.ctx.stroke();
     this.ctx.setLineDash([]);
 
+    this.ctx.strokeStyle = "rgba(77,115,148,0.72)";
+    this.ctx.lineWidth = 1.5;
+    this.ctx.beginPath();
+    this.ctx.moveTo(originX, originY);
+    this.ctx.lineTo(mapper.toX(projX), mapper.toY(projY));
+    this.ctx.stroke();
+
+    this.ctx.strokeStyle = "rgba(127,155,89,0.78)";
+    this.ctx.beginPath();
+    this.ctx.moveTo(mapper.toX(projX), mapper.toY(projY));
+    this.ctx.lineTo(mapper.toX(wx), mapper.toY(wy));
+    this.ctx.stroke();
+
+    this.ctx.fillStyle = "rgba(47,68,84,0.88)";
+    this.ctx.font = "11px IBM Plex Mono";
+    this.ctx.fillText(
+      `p_x=${lx.toFixed(1)}`,
+      (originX + mapper.toX(projX)) * 0.5 + 6,
+      (originY + mapper.toY(projY)) * 0.5 - 6,
+    );
+    this.ctx.fillText(
+      `p_y=${ly.toFixed(1)}`,
+      (mapper.toX(projX) + mapper.toX(wx)) * 0.5 + 6,
+      (mapper.toY(projY) + mapper.toY(wy)) * 0.5 - 6,
+    );
+
     this.ctx.fillStyle = "#a17034";
     this.ctx.beginPath();
     this.ctx.arc(mapper.toX(wx), mapper.toY(wy), 5.5, 0, TAU);
     this.ctx.fill();
     this.ctx.font = "12px IBM Plex Mono";
-    this.ctx.fillText("transformed point", mapper.toX(wx) + 7, mapper.toY(wy) - 8);
+    this.ctx.fillText(`W(${wx.toFixed(1)}, ${wy.toFixed(1)})`, mapper.toX(wx) + 7, mapper.toY(wy) - 8);
 
     const headingHandle = {
       x: this.robot.x + 11 * Math.cos(this.robot.theta),
@@ -146,10 +173,18 @@ export class FrameTransformDemo {
 
     drawRobot(this.ctx, mapper, this.robot, THEME.truePath, "robot frame");
 
-    this.readout.textContent =
-      `Robot pose: (${rx.toFixed(1)}, ${ry.toFixed(1)}, ${theta.toFixed(2)} rad)\n` +
-      `Local point: (${lx.toFixed(1)}, ${ly.toFixed(1)})\n` +
-      `World point: (${wx.toFixed(2)}, ${wy.toFixed(2)})\n` +
-      `Same point, two coordinate systems: local (robot frame) and world (map frame).`;
+    this.ctx.fillStyle = "#2f668e";
+    this.ctx.font = "11px IBM Plex Mono";
+    this.ctx.fillText(`R(${rx.toFixed(1)}, ${ry.toFixed(1)}, ${theta.toFixed(2)})`, mapper.toX(rx) + 8, mapper.toY(ry) + 16);
+
+    drawInfoPanel(this.ctx, this.canvas, {
+      title: "Transform Values",
+      lines: [
+        `R: (${rx.toFixed(1)}, ${ry.toFixed(1)}, ${theta.toFixed(2)} rad)`,
+        `p_local: (${lx.toFixed(1)}, ${ly.toFixed(1)})`,
+        `p_world: (${wx.toFixed(2)}, ${wy.toFixed(2)})`,
+        "Same point expressed in robot and map frames.",
+      ],
+    });
   }
 }

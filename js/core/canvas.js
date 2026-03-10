@@ -92,3 +92,121 @@ export function clampPose(pose) {
   pose.x = clamp(pose.x, 2, 98);
   pose.y = clamp(pose.y, 2, 98);
 }
+
+export function drawInfoPanel(
+  ctx,
+  canvas,
+  {
+    title = "",
+    lines = [],
+    x = null,
+    y = 20,
+    width = 270,
+    padding = 8,
+    lineHeight = 14,
+    anchor = "top-right",
+    background = "rgba(251,253,255,0.94)",
+    border = "rgba(116,136,151,0.55)",
+    titleColor = "#2b3f50",
+    textColor = "#2b3f50",
+  } = {},
+) {
+  const margin = 12;
+  const maxWidth = Math.max(180, canvas.width - margin * 2);
+  const panelWidth = Math.min(Math.max(180, width), maxWidth);
+  const innerWidth = Math.max(40, panelWidth - padding * 2);
+
+  ctx.font = "11px IBM Plex Mono";
+
+  const fitWord = (word, maxLineWidth) => {
+    if (ctx.measureText(word).width <= maxLineWidth) return [word];
+    const chunks = [];
+    let chunk = "";
+    for (const ch of word) {
+      const candidate = chunk + ch;
+      if (ctx.measureText(candidate).width <= maxLineWidth) {
+        chunk = candidate;
+      } else if (chunk.length > 0) {
+        chunks.push(chunk);
+        chunk = ch;
+      }
+    }
+    if (chunk.length > 0) chunks.push(chunk);
+    return chunks.length > 0 ? chunks : ["…"];
+  };
+
+  const wrapText = (text, maxLineWidth) => {
+    const words = String(text).split(/\s+/).filter(Boolean);
+    if (words.length === 0) return [""];
+    const wrapped = [];
+    let line = "";
+    for (const word of words) {
+      const parts = fitWord(word, maxLineWidth);
+      for (const part of parts) {
+        const candidate = line ? `${line} ${part}` : part;
+        if (ctx.measureText(candidate).width <= maxLineWidth) {
+          line = candidate;
+        } else {
+          if (line) wrapped.push(line);
+          line = part;
+        }
+      }
+    }
+    if (line) wrapped.push(line);
+    return wrapped.length > 0 ? wrapped : [""];
+  };
+
+  const wrappedLines = [];
+  for (const line of lines) {
+    if (typeof line === "string") {
+      for (const text of wrapText(line, innerWidth)) wrappedLines.push({ text, color: textColor });
+    } else {
+      const color = line.color || textColor;
+      for (const text of wrapText(line.text || "", innerWidth)) wrappedLines.push({ text, color });
+    }
+  }
+
+  const titleRows = title ? 1 : 0;
+  const separatorRows = title && wrappedLines.length > 0 ? 0.35 : 0;
+  const availableRows = Math.max(
+    1,
+    Math.floor((canvas.height - margin * 2 - padding * 2 - (titleRows + separatorRows) * lineHeight) / lineHeight),
+  );
+
+  if (wrappedLines.length > availableRows) {
+    wrappedLines.length = availableRows;
+    const last = wrappedLines[wrappedLines.length - 1];
+    const ellipsis = " …";
+    let clipped = last.text;
+    while (clipped.length > 1 && ctx.measureText(clipped + ellipsis).width > innerWidth) {
+      clipped = clipped.slice(0, -1);
+    }
+    last.text = `${clipped}${ellipsis}`;
+  }
+
+  const height = padding * 2 + (titleRows + separatorRows + wrappedLines.length) * lineHeight;
+  let boxX = x;
+  if (boxX == null) {
+    boxX = anchor === "top-left" ? margin : canvas.width - panelWidth - margin;
+  }
+  boxX = Math.max(margin, Math.min(boxX, canvas.width - panelWidth - margin));
+  const boxY = Math.max(margin, Math.min(y, canvas.height - height - margin));
+
+  ctx.fillStyle = background;
+  ctx.fillRect(boxX, boxY, panelWidth, height);
+  ctx.strokeStyle = border;
+  ctx.strokeRect(boxX, boxY, panelWidth, height);
+
+  let rowY = boxY + padding + 11;
+  if (title) {
+    ctx.fillStyle = titleColor;
+    ctx.fillText(title, boxX + padding, rowY);
+    rowY += lineHeight * (1 + separatorRows);
+  }
+
+  for (const line of wrappedLines) {
+    ctx.fillStyle = line.color || textColor;
+    ctx.fillText(line.text || "", boxX + padding, rowY);
+    rowY += lineHeight;
+  }
+}

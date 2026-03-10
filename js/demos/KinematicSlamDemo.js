@@ -1,6 +1,6 @@
 import { THEME } from "../core/constants.js";
 import { clamp, makeLandmarks, randn, wrapAngle } from "../core/math.js";
-import { clampPose, drawGrid, drawPath, drawRobot, getMapper } from "../core/canvas.js";
+import { clampPose, drawGrid, drawInfoPanel, drawPath, drawRobot, getMapper } from "../core/canvas.js";
 import { installPlayOverlay } from "../core/playOverlay.js";
 import { modelB } from "../core/models.js";
 
@@ -8,7 +8,6 @@ export class KinematicSlamDemo {
   constructor() {
     this.canvas = document.getElementById("kinematicCanvas");
     this.ctx = this.canvas.getContext("2d");
-    this.readout = document.getElementById("kinematicReadout");
 
     this.odomNoise = document.getElementById("kinOdomNoise");
     this.odomNoiseValue = document.getElementById("kinOdomNoiseValue");
@@ -383,15 +382,19 @@ export class KinematicSlamDemo {
     const kinErr = Math.hypot(this.truePose.x - this.kinPose.x, this.truePose.y - this.kinPose.y);
     const meanMapErr = this.mapError(this.mapKin);
 
-    this.readout.textContent =
-      `Visible landmarks: ${this.visible.length}\n` +
-      `Truth landmarks: ${this.showTruth && this.showTruth.checked ? "shown (fixed)" : "hidden"}\n` +
-      `Correction inliers raw/kin: ${this.rawCorrectionInliers}/${this.kinCorrectionInliers}\n` +
-      `Pose error raw/kin: ${rawErr.toFixed(2)} / ${kinErr.toFixed(2)} units\n` +
-      `Step jump raw/kin: ${this.rawJump.toFixed(2)} / ${this.kinJump.toFixed(2)} units\n` +
-      `Max jump raw/kin: ${this.maxRawJump.toFixed(2)} / ${this.maxKinJump.toFixed(2)} units\n` +
-      `Mean landmark error (kin map): ${meanMapErr.toFixed(2)} units\n` +
-      `Loop closures detected: ${this.loopClosures}\n` +
-      `Interpretation: kinematic constraints should reduce jumps while keeping error competitive.`;
+    drawInfoPanel(this.ctx, this.canvas, {
+      title: "Kinematic vs Raw",
+      lines: [
+        `visible landmarks: ${this.visible.length}`,
+        `truth landmarks: ${this.showTruth && this.showTruth.checked ? "shown" : "hidden"}`,
+        `inliers raw/kin: ${this.rawCorrectionInliers}/${this.kinCorrectionInliers}`,
+        `pose error raw/kin: ${rawErr.toFixed(2)} / ${kinErr.toFixed(2)}`,
+        `step jump raw/kin: ${this.rawJump.toFixed(2)} / ${this.kinJump.toFixed(2)}`,
+        `max jump raw/kin: ${this.maxRawJump.toFixed(2)} / ${this.maxKinJump.toFixed(2)}`,
+        `map error (kin): ${meanMapErr.toFixed(2)} units`,
+        `loop closures: ${this.loopClosures}`,
+      ],
+      width: 360,
+    });
   }
 }

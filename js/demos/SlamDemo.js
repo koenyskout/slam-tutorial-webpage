@@ -1,6 +1,6 @@
 import { TAU, THEME } from "../core/constants.js";
 import { clamp, makeLandmarks, randn, wrapAngle } from "../core/math.js";
-import { clampPose, drawGrid, drawPath, drawRobot, getMapper } from "../core/canvas.js";
+import { clampPose, drawGrid, drawInfoPanel, drawPath, drawRobot, getMapper } from "../core/canvas.js";
 import { installPlayOverlay } from "../core/playOverlay.js";
 import { modelC } from "../core/models.js";
 
@@ -8,7 +8,6 @@ export class SlamDemo {
   constructor() {
     this.canvas = document.getElementById("slamCanvas");
     this.ctx = this.canvas.getContext("2d");
-    this.readout = document.getElementById("slamReadout");
 
     this.odomNoise = document.getElementById("slamOdomNoise");
     this.odomNoiseValue = document.getElementById("slamOdomNoiseValue");
@@ -262,12 +261,16 @@ export class SlamDemo {
     const mapped = this.map.size;
     const meanMapErr = this.mapError();
 
-    this.readout.textContent =
-      `Mapped landmarks: ${mapped}/${this.trueLandmarks.length}\n` +
-      `Pose error (true vs estimate): ${poseErr.toFixed(2)} units\n` +
-      `Mean landmark error: ${meanMapErr.toFixed(2)} units\n` +
-      `Loop closures detected: ${this.loopClosures}\n` +
-      `Interpretation: lower pose/map error means the map and trajectory are becoming self-consistent.\n` +
-      `Truth overlay: ${showTruth ? "visible" : "hidden"}`;
+    drawInfoPanel(this.ctx, this.canvas, {
+      title: "Online SLAM Status",
+      lines: [
+        `mapped landmarks: ${mapped}/${this.trueLandmarks.length}`,
+        `pose error: ${poseErr.toFixed(2)} units`,
+        `mean landmark error: ${meanMapErr.toFixed(2)} units`,
+        `loop closures: ${this.loopClosures}`,
+        `truth overlay: ${showTruth ? "visible" : "hidden"}`,
+      ],
+      width: 320,
+    });
   }
 }

@@ -1,12 +1,12 @@
 import { TAU, THEME } from "../core/constants.js";
 import { clamp, lerp, logistic, randn } from "../core/math.js";
 import { installPlayOverlay } from "../core/playOverlay.js";
+import { drawInfoPanel } from "../core/canvas.js";
 
 export class OccupancyGridDemo {
   constructor() {
     this.canvas = document.getElementById("occupancyCanvas");
     this.ctx = this.canvas.getContext("2d");
-    this.readout = document.getElementById("occupancyReadout");
 
     this.beams = document.getElementById("occBeams");
     this.beamsValue = document.getElementById("occBeamsValue");
@@ -626,17 +626,20 @@ export class OccupancyGridDemo {
       ? `completed (${this.completionReason})`
       : this.exploreMode;
 
-    this.readout.textContent =
-      `Scans integrated: ${this.scanCount}\n` +
-      `Exploration mode: ${status}\n` +
-      `Frontier cells total/reachable: ${this.frontierCount}/${this.reachableFrontierCount}\n` +
-      `Frontier markers: orange dots on estimated map\n` +
-      `Planned steps remaining: ${pathRemaining}\n` +
-      `Occupied confidence threshold (log-odds): ${this.occupiedThreshold.toFixed(2)}\n` +
-      `Confident cells: ${stats.known}/${this.gridW * this.gridH}\n` +
-      `Accuracy on confident cells: ${(stats.accuracy * 100).toFixed(1)}%\n` +
-      `Mean map entropy: ${stats.meanEntropy.toFixed(3)} bits\n` +
-      `Collision-avoiding replans: ${this.collisionAvoids}\n` +
-      `Interpretation: as scanning continues, gray uncertainty should shrink and frontiers should disappear.`;
+    const panelTop = top + this.gridH * size + 16;
+    drawInfoPanel(this.ctx, this.canvas, {
+      title: "Occupancy + Frontier Exploration",
+      anchor: "top-left",
+      x: sidePad,
+      y: panelTop,
+      width: canvas.width - sidePad * 2,
+      lines: [
+        `scans: ${this.scanCount}   mode: ${status}   path steps remaining: ${pathRemaining}`,
+        `frontiers total/reachable: ${this.frontierCount}/${this.reachableFrontierCount}   dots: orange markers`,
+        `occupied threshold (log-odds): ${this.occupiedThreshold.toFixed(2)}   confident cells: ${stats.known}/${this.gridW * this.gridH}`,
+        `accuracy on confident cells: ${(stats.accuracy * 100).toFixed(1)}%   mean entropy: ${stats.meanEntropy.toFixed(3)} bits`,
+        `collision-avoiding replans: ${this.collisionAvoids}`,
+      ],
+    });
   }
 }

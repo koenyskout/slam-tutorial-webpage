@@ -1,6 +1,6 @@
 import { THEME } from "../core/constants.js";
 import { randn, wrapAngle } from "../core/math.js";
-import { clampPose, drawGrid, drawPath, drawRobot, getMapper } from "../core/canvas.js";
+import { clampPose, drawGrid, drawInfoPanel, drawPath, drawRobot, getMapper } from "../core/canvas.js";
 import { installPlayOverlay } from "../core/playOverlay.js";
 import { modelA } from "../core/models.js";
 
@@ -8,7 +8,6 @@ export class OdometryDemo {
   constructor() {
     this.canvas = document.getElementById("odometryCanvas");
     this.ctx = this.canvas.getContext("2d");
-    this.readout = document.getElementById("odometryReadout");
 
     this.noise = document.getElementById("odomNoise");
     this.noiseValue = document.getElementById("odomNoiseValue");
@@ -136,9 +135,13 @@ export class OdometryDemo {
     drawRobot(this.ctx, mapper, this.estPose, THEME.odomPath, "odom");
     this.drawLegend(mapper);
 
-    this.readout.textContent =
-      `Drift: ${this.drift.toFixed(2)} units\n` +
-      `Distance traveled: ${this.travel.toFixed(1)} units\n` +
-      `Interpretation: tiny step errors accumulate, so prediction-only position keeps drifting.`;
+    drawInfoPanel(this.ctx, this.canvas, {
+      title: "Prediction-Only Drift",
+      lines: [
+        `drift: ${this.drift.toFixed(2)} units`,
+        `distance: ${this.travel.toFixed(1)} units`,
+        "Small odometry errors accumulate over time.",
+      ],
+    });
   }
 }

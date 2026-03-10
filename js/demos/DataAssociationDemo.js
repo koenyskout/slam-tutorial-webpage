@@ -1,13 +1,12 @@
 import { TAU, THEME } from "../core/constants.js";
 import { clamp, randn, wrapAngle } from "../core/math.js";
-import { drawGrid, drawRobot, getMapper } from "../core/canvas.js";
+import { drawGrid, drawInfoPanel, drawRobot, getMapper } from "../core/canvas.js";
 import { installPlayOverlay } from "../core/playOverlay.js";
 
 export class DataAssociationDemo {
   constructor() {
     this.canvas = document.getElementById("associationCanvas");
     this.ctx = this.canvas.getContext("2d");
-    this.readout = document.getElementById("associationReadout");
 
     this.noiseDown = document.getElementById("assocNoiseDown");
     this.noiseUp = document.getElementById("assocNoiseUp");
@@ -256,10 +255,16 @@ export class DataAssociationDemo {
     drawRobot(this.ctx, mapper, this.robot, THEME.odomPath, "robot");
 
     const wrongRate = this.totalSamples > 0 ? (100 * this.wrongSamples) / this.totalSamples : 0;
-    this.readout.textContent =
-      `Selected landmark: ${selectedLm.id} (${this.observation.selected === 0 ? "correct" : "wrong"})\n` +
-      `p(L1/L2/L3): ${this.observation.probs.map((p) => p.toFixed(2)).join(" / ")}\n` +
-      `Wrong association rate: ${wrongRate.toFixed(1)}% (${this.wrongSamples}/${this.totalSamples})\n` +
-      `Interpretation: close landmarks + high noise = ambiguous matches and more wrong updates.`;
+    drawInfoPanel(this.ctx, this.canvas, {
+      title: "Association Status",
+      lines: [
+        `selected: ${selectedLm.id} (${this.observation.selected === 0 ? "correct" : "wrong"})`,
+        `p(L1/L2/L3): ${this.observation.probs.map((p) => p.toFixed(2)).join(" / ")}`,
+        `wrong rate: ${wrongRate.toFixed(1)}% (${this.wrongSamples}/${this.totalSamples})`,
+        "High noise + close landmarks cause confusion.",
+      ],
+      anchor: "top-right",
+      width: 360,
+    });
   }
 }

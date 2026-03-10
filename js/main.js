@@ -1,8 +1,8 @@
 import { FrameTransformDemo } from "./demos/FrameTransformDemo.js";
+import { LinkedSlamExampleDemo } from "./demos/LinkedSlamExampleDemo.js";
 import { OdometryDemo } from "./demos/OdometryDemo.js";
 import { BayesianUpdateDemo } from "./demos/BayesianUpdateDemo.js";
 import { CovarianceDemo } from "./demos/CovarianceDemo.js";
-import { EquationIntuitionGallery } from "./demos/EquationIntuitionGallery.js";
 import { CorrectionDemo } from "./demos/CorrectionDemo.js";
 import { DataAssociationDemo } from "./demos/DataAssociationDemo.js";
 import { SlamDemo } from "./demos/SlamDemo.js";
@@ -13,6 +13,7 @@ import { KinematicSlamDemo } from "./demos/KinematicSlamDemo.js";
 function buildDemos() {
   const registry = [
     { canvasId: "framesCanvas", ctor: FrameTransformDemo },
+    { canvasId: "linkedExampleCanvas", ctor: LinkedSlamExampleDemo },
     { canvasId: "odometryCanvas", ctor: OdometryDemo },
     { canvasId: "bayesCanvas", ctor: BayesianUpdateDemo },
     { canvasId: "covarianceCanvas", ctor: CovarianceDemo },
@@ -51,6 +52,5 @@ function animateDemos(demos) {
 
 window.addEventListener("DOMContentLoaded", () => {
   const demos = buildDemos();
-  new EquationIntuitionGallery();
   animateDemos(demos);
 });
