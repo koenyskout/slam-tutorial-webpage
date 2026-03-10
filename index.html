@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Interactive SLAM Visualized</title>
+    <title>SLAM Course: Learn Step by Step</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -15,27 +15,59 @@
   <body>
     <main>
       <header class="hero">
-        <p class="eyebrow">Robotics Visualization Lab</p>
-        <h1>SLAM, Explained Like a Living System</h1>
+        <p class="eyebrow">Interactive Robotics Course</p>
+        <h1>How SLAM Works: A Step-by-Step Visual Tutorial</h1>
         <p class="lede">
-          Simultaneous Localization and Mapping (SLAM) lets a robot answer two questions at once:
-          <strong>Where am I?</strong> and <strong>What does the world look like?</strong>.
-          The demos below show how drift appears, how landmarks correct it, and how a map emerges over time.
+          This mini-course teaches SLAM by building the idea in layers: motion estimation,
+          sensor correction, mapping, and physically plausible motion constraints.
         </p>
       </header>
 
-      <section class="story" id="odometry-story">
+      <section class="course-panel">
+        <div class="course-panel-head">
+          <h2>Course Roadmap</h2>
+          <button id="resetCourseBtn" class="secondary">Reset Progress</button>
+        </div>
+        <div class="progress-row">
+          <strong id="courseProgressCount">0 / 4 lessons complete</strong>
+          <span id="courseProgressText">Start Lesson 1 to begin.</span>
+        </div>
+        <div class="progress-bar" aria-label="Course progress">
+          <div id="courseProgressFill"></div>
+        </div>
+        <ol class="course-steps">
+          <li><a class="lesson-nav-link" href="#odometry-story" data-step-target="odometry-story">Lesson 1: Odometry Drift</a></li>
+          <li><a class="lesson-nav-link" href="#correction-story" data-step-target="correction-story">Lesson 2: Measurement Update</a></li>
+          <li><a class="lesson-nav-link" href="#slam-story" data-step-target="slam-story">Lesson 3: Online Mapping</a></li>
+          <li><a class="lesson-nav-link" href="#kinematic-story" data-step-target="kinematic-story">Lesson 4: Kinematic Constraints</a></li>
+        </ol>
+      </section>
+
+      <section class="story lesson" id="odometry-story" data-step="1">
         <div class="story-grid">
           <div class="story-copy">
-            <h2>1. Dead Reckoning Drifts</h2>
+            <p class="lesson-tag">Lesson 1</p>
+            <h2>Dead Reckoning and Why Drift Is Inevitable</h2>
             <p>
-              A robot can estimate its movement from wheel encoders and gyros. This is called
-              <em>odometry</em>. It is fast, but tiny errors accumulate.
+              Odometry predicts movement from wheel encoders and gyros. It is fast and continuous,
+              but every tiny error is integrated, so uncertainty keeps growing.
             </p>
-            <p>
-              In blue you see the true robot path. In amber you see the odometry-only estimate.
-              Increase odometry noise and watch the estimate peel away.
-            </p>
+            <div class="objective-box">
+              <h3>Learning Goals</h3>
+              <ul>
+                <li>Understand prediction-only localization.</li>
+                <li>See cumulative drift as a function of noise and distance.</li>
+                <li>Read pose error directly from true vs estimated tracks.</li>
+              </ul>
+            </div>
+            <div class="challenge-box">
+              <h3>Try This</h3>
+              <p>Set odometry noise above 1.8 and watch how quickly drift increases over 20 seconds.</p>
+              <div class="challenge-actions">
+                <button class="complete-step-btn" data-step-id="odometry-story">Mark Lesson Complete</button>
+                <span class="step-status" data-step-status="odometry-story">Not completed</span>
+              </div>
+            </div>
             <div class="readout" id="odometryReadout"></div>
           </div>
 
@@ -58,21 +90,46 @@
               </div>
             </div>
           </div>
+
+          <div class="quiz-box">
+            <h3>Check Your Understanding</h3>
+            <p>Why does the odometry estimate diverge?</p>
+            <label><input type="radio" name="quiz-odom" value="a" /> Because the map landmarks are wrong.</label>
+            <label><input type="radio" name="quiz-odom" value="b" /> Small motion errors accumulate over time.</label>
+            <label><input type="radio" name="quiz-odom" value="c" /> The robot is moving too fast for SLAM.</label>
+            <div class="challenge-actions">
+              <button class="quiz-check-btn" data-quiz="quiz-odom" data-correct="b" data-step-id="odometry-story">Check Answer</button>
+              <span class="quiz-feedback" data-quiz-feedback="quiz-odom"></span>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section class="story" id="correction-story">
+      <section class="story lesson" id="correction-story" data-step="2">
         <div class="story-grid">
           <div class="story-copy">
-            <h2>2. Landmarks Pull the Estimate Back</h2>
+            <p class="lesson-tag">Lesson 2</p>
+            <h2>Measurement Update: Landmarks Correct Drift</h2>
             <p>
-              If the robot sees known landmarks (fiducials, poles, corners), it can correct its pose.
-              This is the measurement update step: combine prediction from odometry with sensor evidence.
+              SLAM fuses a prediction (odometry) with observations (landmarks). This update
+              keeps the state estimate anchored to physical measurements.
             </p>
-            <p>
-              The corrected estimate (teal) is constantly tugged toward consistency with visible landmarks.
-              Adjust the correction gain to feel the filter behavior.
-            </p>
+            <div class="objective-box">
+              <h3>Learning Goals</h3>
+              <ul>
+                <li>Understand prediction vs correction phases.</li>
+                <li>Explore gain tuning and noise tradeoffs.</li>
+                <li>Observe corrected error relative to raw odometry error.</li>
+              </ul>
+            </div>
+            <div class="challenge-box">
+              <h3>Try This</h3>
+              <p>Raise sensor noise above 1.6, then increase correction gain. Notice over/under correction behavior.</p>
+              <div class="challenge-actions">
+                <button class="complete-step-btn" data-step-id="correction-story">Mark Lesson Complete</button>
+                <span class="step-status" data-step-status="correction-story">Not completed</span>
+              </div>
+            </div>
             <div class="readout" id="correctionReadout"></div>
           </div>
 
@@ -100,21 +157,46 @@
               </div>
             </div>
           </div>
+
+          <div class="quiz-box">
+            <h3>Check Your Understanding</h3>
+            <p>What does increasing correction gain usually do?</p>
+            <label><input type="radio" name="quiz-corr" value="a" /> It ignores sensors and trusts odometry more.</label>
+            <label><input type="radio" name="quiz-corr" value="b" /> It trusts measurements more strongly in each update.</label>
+            <label><input type="radio" name="quiz-corr" value="c" /> It removes all noise from both sensors and odometry.</label>
+            <div class="challenge-actions">
+              <button class="quiz-check-btn" data-quiz="quiz-corr" data-correct="b" data-step-id="correction-story">Check Answer</button>
+              <span class="quiz-feedback" data-quiz-feedback="quiz-corr"></span>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section class="story" id="slam-story">
+      <section class="story lesson" id="slam-story" data-step="3">
         <div class="story-grid">
           <div class="story-copy">
-            <h2>3. Full SLAM: Build the Map While Moving</h2>
+            <p class="lesson-tag">Lesson 3</p>
+            <h2>Online SLAM: Build the Map While Estimating Pose</h2>
             <p>
-              Here landmarks are unknown at the start. The robot creates map points from observations,
-              then keeps refining both pose and map as it revisits the area.
+              Unknown landmarks are initialized from observations, then refined every time
+              the robot revisits them. This couples localization and mapping.
             </p>
-            <p>
-              Fading circles show uncertainty around landmark estimates. Re-observing landmarks shrinks
-              uncertainty and stabilizes the trajectory.
-            </p>
+            <div class="objective-box">
+              <h3>Learning Goals</h3>
+              <ul>
+                <li>Understand why map quality improves with revisits.</li>
+                <li>Observe uncertainty shrinking from repeated measurements.</li>
+                <li>Relate loop closures to global consistency.</li>
+              </ul>
+            </div>
+            <div class="challenge-box">
+              <h3>Try This</h3>
+              <p>Run until at least 20 landmarks are mapped. Toggle ground truth to compare estimated map quality.</p>
+              <div class="challenge-actions">
+                <button class="complete-step-btn" data-step-id="slam-story">Mark Lesson Complete</button>
+                <span class="step-status" data-step-status="slam-story">Not completed</span>
+              </div>
+            </div>
             <div class="readout" id="slamReadout"></div>
           </div>
 
@@ -146,21 +228,46 @@
               </div>
             </div>
           </div>
+
+          <div class="quiz-box">
+            <h3>Check Your Understanding</h3>
+            <p>Why are loop closures important in SLAM?</p>
+            <label><input type="radio" name="quiz-slam" value="a" /> They increase robot speed in uncertain areas.</label>
+            <label><input type="radio" name="quiz-slam" value="b" /> They reduce drift by connecting current estimates to previously mapped places.</label>
+            <label><input type="radio" name="quiz-slam" value="c" /> They disable sensor noise temporarily.</label>
+            <div class="challenge-actions">
+              <button class="quiz-check-btn" data-quiz="quiz-slam" data-correct="b" data-step-id="slam-story">Check Answer</button>
+              <span class="quiz-feedback" data-quiz-feedback="quiz-slam"></span>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section class="story" id="kinematic-story">
+      <section class="story lesson" id="kinematic-story" data-step="4">
         <div class="story-grid">
           <div class="story-copy">
-            <h2>4. Kinematic SLAM: Motion Constraints Remove Jumps</h2>
+            <p class="lesson-tag">Lesson 4</p>
+            <h2>Kinematic Constraints: Physically Plausible SLAM</h2>
             <p>
-              Directly applying SLAM corrections to position can create visible pose jumps. Real vehicles cannot
-              teleport: they obey acceleration and turn-rate limits.
+              State updates should respect vehicle dynamics. By enforcing acceleration and yaw-rate limits,
+              correction steps become smooth and physically realistic.
             </p>
-            <p>
-              This demo compares an unconstrained estimate (dashed gray) to a kinematic estimate (green) with
-              bounded acceleration and yaw-rate. The constrained track moves smoothly, even when corrections are noisy.
-            </p>
+            <div class="objective-box">
+              <h3>Learning Goals</h3>
+              <ul>
+                <li>See how unconstrained correction creates jumpy trajectories.</li>
+                <li>Use kinematic limits to smooth updates.</li>
+                <li>Compare raw and constrained tracking errors.</li>
+              </ul>
+            </div>
+            <div class="challenge-box">
+              <h3>Try This</h3>
+              <p>Enable baseline, raise correction gain, and lower max yaw-rate. Compare jump metrics in the readout.</p>
+              <div class="challenge-actions">
+                <button class="complete-step-btn" data-step-id="kinematic-story">Mark Lesson Complete</button>
+                <span class="step-status" data-step-status="kinematic-story">Not completed</span>
+              </div>
+            </div>
             <div class="readout" id="kinematicReadout"></div>
           </div>
 
@@ -197,14 +304,34 @@
               </div>
             </div>
           </div>
+
+          <div class="quiz-box">
+            <h3>Final Check</h3>
+            <p>What is the main benefit of adding kinematic constraints to SLAM updates?</p>
+            <label><input type="radio" name="quiz-kin" value="a" /> It reduces the need for landmarks.</label>
+            <label><input type="radio" name="quiz-kin" value="b" /> It enforces physically plausible motion and reduces jump artifacts.</label>
+            <label><input type="radio" name="quiz-kin" value="c" /> It guarantees zero localization error.</label>
+            <div class="challenge-actions">
+              <button class="quiz-check-btn" data-quiz="quiz-kin" data-correct="b" data-step-id="kinematic-story">Check Answer</button>
+              <span class="quiz-feedback" data-quiz-feedback="quiz-kin"></span>
+            </div>
+          </div>
+
+          <div class="course-complete" id="courseCompleteCard" hidden>
+            <h3>Course Completed</h3>
+            <p>
+              You completed all 4 lessons. You now have the full SLAM pipeline intuition:
+              prediction, correction, map refinement, and kinematic consistency.
+            </p>
+          </div>
         </div>
       </section>
     </main>
 
     <footer>
       <p>
-        Tip: SLAM is a family of algorithms (EKF-SLAM, FastSLAM, Graph-SLAM, Visual SLAM). These
-        simulations are pedagogical and intentionally simplified.
+        Suggested extension: implement EKF equations for the 2D pose and landmark state to connect these visuals
+        to a formal SLAM derivation.
       </p>
     </footer>
 

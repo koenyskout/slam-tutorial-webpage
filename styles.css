@@ -1,12 +1,14 @@
 :root {
   --page: #f7f8f9;
   --surface: #ffffff;
+  --surface-soft: #fbfcfd;
   --ink: #222f3a;
   --ink-soft: #5f6c78;
   --line: #dbe2e8;
   --line-strong: #cbd5de;
   --accent: #2f668e;
   --accent-warm: #9b6a33;
+  --ok: #2e7b57;
 }
 
 * {
@@ -27,19 +29,21 @@ body {
 }
 
 main {
-  padding: 2.25rem 0 3rem;
+  padding: 2.2rem 0 3rem;
 }
 
 .hero,
+.course-panel,
 .story-copy,
+.quiz-box,
+.course-complete,
 footer p {
-  width: min(100% - 2.2rem, 720px);
+  width: min(100% - 2.2rem, 760px);
   margin-inline: auto;
 }
 
 .hero {
-  margin-bottom: 2.6rem;
-  text-align: left;
+  margin-bottom: 1.9rem;
 }
 
 .eyebrow {
@@ -52,54 +56,172 @@ footer p {
 }
 
 h1,
-h2 {
+h2,
+h3 {
   margin: 0;
   line-height: 1.1;
-  font-weight: 600;
   letter-spacing: -0.01em;
 }
 
 h1 {
   font-size: clamp(2rem, 4.5vw, 3.3rem);
+  font-weight: 600;
+}
+
+h2 {
+  font-size: clamp(1.4rem, 2.6vw, 2rem);
+  font-weight: 600;
+}
+
+h3 {
+  font-size: 1.03rem;
+  font-family: "IBM Plex Sans", "Avenir Next", sans-serif;
+  font-weight: 600;
 }
 
 .lede {
-  margin: 0.95rem 0 0;
+  margin: 0.9rem 0 0;
   color: var(--ink-soft);
   font-size: clamp(1.02rem, 1.7vw, 1.16rem);
 }
 
+.course-panel {
+  margin-bottom: 2.1rem;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--surface), var(--surface-soft));
+  border-radius: 10px;
+  padding: 0.9rem 0.95rem 0.95rem;
+}
+
+.course-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 0.6rem;
+}
+
+.progress-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  font-family: "IBM Plex Sans", "Avenir Next", sans-serif;
+  font-size: 0.89rem;
+  color: #495765;
+}
+
+.progress-row strong {
+  color: #2a3a48;
+}
+
+.progress-bar {
+  margin-top: 0.55rem;
+  border: 1px solid var(--line);
+  background: #f0f4f7;
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+#courseProgressFill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #5e87a9, #3b6f99);
+  transition: width 220ms ease;
+}
+
+.course-steps {
+  margin: 0.8rem 0 0;
+  padding-left: 1.15rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.course-steps a {
+  color: #3b5f7d;
+  text-decoration: none;
+  border-bottom: 1px dotted transparent;
+}
+
+.course-steps a:hover {
+  border-bottom-color: currentColor;
+}
+
+.course-steps a.is-active {
+  font-weight: 600;
+  color: #274a67;
+}
+
+.course-steps a.is-complete {
+  color: var(--ok);
+}
+
 .story {
-  margin: 0 0 3rem;
+  margin: 0 0 3.1rem;
 }
 
 .story-grid {
   display: block;
 }
 
-.story-copy {
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  padding: 0;
-}
-
-.story-copy h2 {
-  margin-bottom: 0.7rem;
-  font-size: clamp(1.4rem, 2.6vw, 1.95rem);
+.lesson-tag {
+  margin: 0 0 0.35rem;
+  font: 600 0.73rem/1 "IBM Plex Sans", "Avenir Next", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #6a8196;
 }
 
 .story-copy p {
-  margin: 0 0 0.9rem;
+  margin: 0.75rem 0 0;
   color: var(--ink-soft);
 }
 
+.objective-box,
+.challenge-box {
+  margin-top: 0.9rem;
+  border-left: 2px solid var(--line-strong);
+  padding-left: 0.75rem;
+}
+
+.objective-box ul {
+  margin: 0.45rem 0 0;
+  padding-left: 1.05rem;
+  color: #4e5f6f;
+}
+
+.challenge-actions {
+  margin-top: 0.6rem;
+  display: flex;
+  gap: 0.58rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.step-status,
+.quiz-feedback {
+  font: 0.78rem/1.4 "IBM Plex Sans", "Avenir Next", sans-serif;
+  color: #5d6c7a;
+}
+
+.step-status.is-complete,
+.quiz-feedback.is-correct {
+  color: var(--ok);
+  font-weight: 500;
+}
+
+.quiz-feedback.is-wrong {
+  color: #9a3f3f;
+  font-weight: 500;
+}
+
 .readout {
-  margin: 1rem 0 0;
+  margin-top: 1rem;
   padding: 0.2rem 0 0.2rem 0.75rem;
   border: 0;
   border-left: 2px solid var(--line-strong);
-  border-radius: 0;
   background: transparent;
   color: #465867;
   font: 0.8rem/1.55 "IBM Plex Mono", monospace;
@@ -108,7 +230,7 @@ h1 {
 
 .viz-panel {
   width: min(1240px, calc(100vw - 2rem));
-  margin: 1.15rem auto 0;
+  margin: 1.05rem auto 0;
   border: 1px solid var(--line-strong);
   border-radius: 7px;
   background: var(--surface);
@@ -163,6 +285,28 @@ canvas {
   grid-column: 1 / -1;
 }
 
+.quiz-box,
+.course-complete {
+  margin-top: 0.9rem;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 0.7rem 0.75rem;
+}
+
+.quiz-box p,
+.course-complete p {
+  margin: 0.45rem 0 0;
+  color: #546473;
+}
+
+.quiz-box label {
+  display: block;
+  margin-top: 0.44rem;
+  font: 0.9rem/1.5 "IBM Plex Sans", "Avenir Next", sans-serif;
+  color: #324354;
+}
+
 button {
   appearance: none;
   border: 1px solid #c3ced8;
@@ -204,6 +348,15 @@ footer {
     padding-top: 1.8rem;
   }
 
+  .hero,
+  .course-panel,
+  .story-copy,
+  .quiz-box,
+  .course-complete,
+  footer p {
+    width: min(100% - 1.25rem, 760px);
+  }
+
   .viz-panel {
     width: calc(100vw - 1.2rem);
     margin-top: 0.95rem;
@@ -213,5 +366,10 @@ footer {
   .controls {
     grid-template-columns: 1fr;
     gap: 0.58rem;
+  }
+
+  .course-panel-head {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

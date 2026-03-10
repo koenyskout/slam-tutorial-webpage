@@ -1071,8 +1071,186 @@ class KinematicSlamDemo {
   }
 }
 
+class CourseController {
+  constructor() {
+    this.storageKey = "slam-course-progress-v1";
+    this.lessons = Array.from(document.querySelectorAll(".lesson"));
+    this.lessonIds = this.lessons.map((lesson) => lesson.id);
+    this.totalLessons = this.lessonIds.length;
+
+    this.progressCount = document.getElementById("courseProgressCount");
+    this.progressFill = document.getElementById("courseProgressFill");
+    this.progressText = document.getElementById("courseProgressText");
+    this.completeCard = document.getElementById("courseCompleteCard");
+
+    this.statusNodes = new Map();
+    for (const node of document.querySelectorAll("[data-step-status]")) {
+      this.statusNodes.set(node.dataset.stepStatus, node);
+    }
+
+    this.navLinks = Array.from(document.querySelectorAll(".lesson-nav-link"));
+    this.completed = this.loadProgress();
+
+    this.bind();
+    this.observeActiveLesson();
+    this.updateProgressUI();
+  }
+
+  loadProgress() {
+    try {
+      const raw = localStorage.getItem(this.storageKey);
+      if (!raw) return new Set();
+      const parsed = JSON.parse(raw);
+      const valid = parsed.filter((id) => this.lessonIds.includes(id));
+      return new Set(valid);
+    } catch {
+      return new Set();
+    }
+  }
+
+  saveProgress() {
+    try {
+      localStorage.setItem(this.storageKey, JSON.stringify([...this.completed]));
+    } catch {
+      // Ignore storage errors in restricted environments.
+    }
+  }
+
+  bind() {
+    for (const button of document.querySelectorAll(".complete-step-btn")) {
+      button.addEventListener("click", () => {
+        this.markComplete(button.dataset.stepId);
+      });
+    }
+
+    for (const button of document.querySelectorAll(".quiz-check-btn")) {
+      button.addEventListener("click", () => {
+        this.checkQuiz(button);
+      });
+    }
+
+    const resetButton = document.getElementById("resetCourseBtn");
+    if (resetButton) {
+      resetButton.addEventListener("click", () => this.resetProgress());
+    }
+  }
+
+  observeActiveLesson() {
+    if (typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        let candidate = null;
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          if (!candidate || entry.intersectionRatio > candidate.intersectionRatio) {
+            candidate = entry;
+          }
+        }
+        if (!candidate) return;
+        this.setActiveNav(candidate.target.id);
+      },
+      { threshold: [0.35, 0.6, 0.9] },
+    );
+
+    for (const lesson of this.lessons) {
+      observer.observe(lesson);
+    }
+  }
+
+  setActiveNav(stepId) {
+    for (const link of this.navLinks) {
+      link.classList.toggle("is-active", link.dataset.stepTarget === stepId);
+    }
+  }
+
+  markComplete(stepId) {
+    if (!this.lessonIds.includes(stepId)) return;
+    this.completed.add(stepId);
+    this.saveProgress();
+    this.updateProgressUI();
+  }
+
+  checkQuiz(button) {
+    const quizName = button.dataset.quiz;
+    const correct = button.dataset.correct;
+    const stepId = button.dataset.stepId;
+    const feedback = document.querySelector(`[data-quiz-feedback=\"${quizName}\"]`);
+    if (!feedback) return;
+
+    const selected = document.querySelector(`input[name=\"${quizName}\"]:checked`);
+    feedback.classList.remove("is-correct", "is-wrong");
+
+    if (!selected) {
+      feedback.textContent = "Select an answer first.";
+      feedback.classList.add("is-wrong");
+      return;
+    }
+
+    if (selected.value === correct) {
+      feedback.textContent = "Correct. Lesson marked complete.";
+      feedback.classList.add("is-correct");
+      this.markComplete(stepId);
+      return;
+    }
+
+    feedback.textContent = "Not quite. Try again after interacting with the demo.";
+    feedback.classList.add("is-wrong");
+  }
+
+  resetProgress() {
+    this.completed.clear();
+    this.saveProgress();
+
+    for (const radio of document.querySelectorAll(".quiz-box input[type=\"radio\"]")) {
+      radio.checked = false;
+    }
+    for (const feedback of document.querySelectorAll(".quiz-feedback")) {
+      feedback.textContent = "";
+      feedback.classList.remove("is-correct", "is-wrong");
+    }
+
+    this.updateProgressUI();
+  }
+
+  updateProgressUI() {
+    const completedCount = this.completed.size;
+    const percent = this.totalLessons > 0 ? (completedCount / this.totalLessons) * 100 : 0;
+
+    this.progressCount.textContent = `${completedCount} / ${this.totalLessons} lessons complete`;
+    this.progressFill.style.width = `${percent}%`;
+
+    const firstIncomplete = this.lessonIds.find((id) => !this.completed.has(id));
+    this.progressText.textContent = firstIncomplete
+      ? `Next up: ${this.lessonTitle(firstIncomplete)}`
+      : "All lessons complete. Review any lesson to reinforce intuition.";
+
+    for (const [stepId, statusNode] of this.statusNodes.entries()) {
+      const done = this.completed.has(stepId);
+      statusNode.textContent = done ? "Completed" : "Not completed";
+      statusNode.classList.toggle("is-complete", done);
+    }
+
+    for (const link of this.navLinks) {
+      const stepId = link.dataset.stepTarget;
+      link.classList.toggle("is-complete", this.completed.has(stepId));
+    }
+
+    if (this.completeCard) {
+      this.completeCard.hidden = completedCount !== this.totalLessons;
+    }
+  }
+
+  lessonTitle(stepId) {
+    const lesson = document.getElementById(stepId);
+    const titleNode = lesson ? lesson.querySelector("h2") : null;
+    return titleNode ? titleNode.textContent : "Next lesson";
+  }
+}
+
 function init() {
   const demos = [new OdometryDemo(), new CorrectionDemo(), new SlamDemo(), new KinematicSlamDemo()];
+  new CourseController();
   let last = performance.now();
 
   const animate = (now) => {
