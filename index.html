@@ -52,10 +52,12 @@
           <li><a href="#pipeline-story">The SLAM Recursion: Predict, Correct, Repeat</a></li>
           <li><a href="#frames-story">State, Frames, and Coordinate Transforms</a></li>
           <li><a href="#odometry-story">Prediction from Odometry</a></li>
+          <li><a href="#covariance-story">Uncertainty as Covariance Ellipses (EKF Intuition)</a></li>
           <li><a href="#bayes-story">Probabilistic Fusion (Bayesian / Kalman Intuition)</a></li>
           <li><a href="#correction-story">Measurement Update with Known Landmarks</a></li>
           <li><a href="#association-story">Data Association: Which Landmark Was Observed?</a></li>
           <li><a href="#slam-story">Online SLAM: Estimating Pose and Map Together</a></li>
+          <li><a href="#posegraph-story">Pose Graphs and Loop Closure Optimization</a></li>
           <li><a href="#occupancy-story">Occupancy Grid Mapping from Range Beams</a></li>
           <li><a href="#kinematic-story">Kinematic Constraints and Smooth Corrections</a></li>
         </ol>
@@ -74,6 +76,10 @@
               A useful everyday analogy is walking in a dark building with a weak flashlight and a noisy step counter.
               You are constantly combining: "How far I think I moved" + "What I think I just saw."
             </p>
+            <p>
+              In robotics language, "where I am" is <em>localization</em>, and "what the world looks like" is
+              <em>mapping</em>. SLAM couples them: better localization gives better maps, and better maps improve localization.
+            </p>
             <div class="guide-block">
               <p class="guide-title">How To Use This Chapter</p>
               <ul class="guide-list">
@@ -90,6 +96,10 @@
                 <li>Green: corrected estimate after fusing information.</li>
               </ul>
             </div>
+            <div class="note-block">
+              <strong>Two common map types.</strong> This chapter covers both:
+              sparse landmarks (discrete points) and occupancy grids (cell-wise free/occupied probabilities).
+            </div>
           </div>
         </div>
       </section>
@@ -104,7 +114,7 @@
               <strong>predict</strong> where the robot went, then <strong>correct</strong> that prediction with sensor data.
               Over time, this loop estimates both robot pose and map.
             </p>
-            <div class="equation-block">
+            <div class="equation-block" data-eq-viz="bayes-recursion">
               \[
               p(x_k,m \mid z_{1:k},u_{1:k})
               \propto
@@ -115,7 +125,31 @@
             <p>
               If this equation looks heavy, treat it as bookkeeping:
               \(u_k\) is motion input, \(z_k\) is sensor data, \(x_k\) is pose, and \(m\) is map.
-              Sections 1-5 unpack these pieces one by one. Sections 6-8 put them back together.
+              The next sections unpack these symbols one by one, then rebuild them into full SLAM systems.
+            </p>
+            <div class="guide-block">
+              <p class="guide-title">Notation Cheat Sheet</p>
+              <ul class="guide-list">
+                <li>\(x_k\): robot pose at time step \(k\), usually \((x,y,\theta)\) in 2D.</li>
+                <li>\(u_k\): control or odometry input between \(k-1\) and \(k\).</li>
+                <li>\(z_k\): sensor measurements at time \(k\) (ranges, bearings, scan points, etc.).</li>
+                <li>\(m\): map state (landmarks or occupancy cells).</li>
+              </ul>
+            </div>
+            <div class="equation-block" data-eq-viz="ekf-cycle">
+              \[
+              \begin{aligned}
+              \text{Predict: } & \hat{x}_k^- = f(\hat{x}_{k-1}, u_k), \quad P_k^- = F_k P_{k-1} F_k^\top + Q_k\\
+              \text{Correct: } & K_k = P_k^- H_k^\top (H_k P_k^- H_k^\top + R_k)^{-1},\\
+              & \hat{x}_k = \hat{x}_k^- + K_k (z_k - h(\hat{x}_k^-)), \quad
+              P_k = (I - K_k H_k)P_k^-
+              \end{aligned}
+              \]
+            </div>
+            <p>
+              This is the EKF form of the same recursion. You do not need to memorize it immediately.
+              Use it as a map: <em>motion model \(f\)</em>, <em>measurement model \(h\)</em>, and uncertainty matrices
+              \(Q_k\), \(R_k\), \(P_k\).
             </p>
           </div>
         </div>
@@ -135,7 +169,7 @@
               Sensors usually report points relative to the robot ("2 meters ahead"), not in map coordinates.
               This equation converts local sensor coordinates into world/map coordinates:
             </p>
-            <div class="equation-block">
+            <div class="equation-block" data-eq-viz="transform-2d">
               \[
               \begin{aligned}
               x_w &= x + p_x\cos\theta - p_y\sin\theta \\
@@ -183,7 +217,7 @@
               Odometry is "where I think I moved" from wheel encoders or motion sensors.
               If the robot moves by \(\Delta s\) and turns by \(\Delta \theta\), one common update is:
             </p>
-            <div class="equation-block">
+            <div class="equation-block" data-eq-viz="odom-integration">
               \[
               \begin{aligned}
               x_k &= x_{k-1} + \Delta s \cos(\theta_{k-1}) \\
@@ -235,21 +269,78 @@
         </div>
       </section>
 
-      <section class="story" id="bayes-story">
+      <section class="story" id="covariance-story">
         <div class="story-grid">
           <div class="story-copy">
             <p class="chapter-number">Section 3</p>
+            <h2>Uncertainty as Covariance Ellipses (EKF Core Geometry)</h2>
+            <p>
+              In many SLAM systems, uncertainty is represented by a Gaussian belief:
+              mean pose \( \boldsymbol{\mu} \) and covariance matrix \( \Sigma \).
+              In 2D position, \( \Sigma \) becomes an ellipse: orientation shows correlated error,
+              axis lengths show uncertainty magnitude.
+            </p>
+            <div class="equation-block" data-eq-viz="gaussian-levelset">
+              \[
+              p(\mathbf{x}) = \mathcal{N}(\mathbf{x};\boldsymbol{\mu},\Sigma), \qquad
+              (\mathbf{x}-\boldsymbol{\mu})^\top \Sigma^{-1} (\mathbf{x}-\boldsymbol{\mu}) = \chi^2_{2,\alpha}
+              \]
+            </div>
+            <p>
+              EKF fusion in information form is:
+            </p>
+            <div class="equation-block" data-eq-viz="info-fusion">
+              \[
+              \Sigma^+ = \left((\Sigma^-)^{-1} + R^{-1}\right)^{-1}, \qquad
+              \boldsymbol{\mu}^+ = \Sigma^+ \left((\Sigma^-)^{-1}\boldsymbol{\mu}^- + R^{-1}\mathbf{z}\right)
+              \]
+            </div>
+            <p>
+              Here, blue is ground-truth state, gray is prior belief \((\boldsymbol{\mu}^-, \Sigma^-)\),
+              orange is measurement model \((\mathbf{z}, R)\), and green is fused posterior belief.
+            </p>
+            <div class="guide-block">
+              <p class="guide-title">Try This In The Figure</p>
+              <ul class="guide-list">
+                <li>Drag blue/gray/orange means to create disagreement between truth, prediction, and measurement.</li>
+                <li>Stretch a major axis to increase uncertainty in one direction.</li>
+                <li>Rotate ellipses and watch how posterior orientation changes with anisotropic uncertainty.</li>
+              </ul>
+            </div>
+            <div class="readout" id="covarianceReadout"></div>
+          </div>
+
+          <div class="viz-panel">
+            <canvas id="covarianceCanvas" width="960" height="560"></canvas>
+            <div class="controls">
+              <p class="control-help">
+                Blue handle = truth state. Gray/orange handles set prior and measurement means/covariances:
+                center point = mean, long-axis = principal variance+angle, short-axis = orthogonal variance.
+              </p>
+              <div class="button-row">
+                <button id="covarianceReset" class="secondary">Reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="story" id="bayes-story">
+        <div class="story-grid">
+          <div class="story-copy">
+            <p class="chapter-number">Section 4</p>
             <h2>Probabilistic Fusion: Prior + Measurement = Posterior</h2>
             <p>
               In SLAM, we do not keep one exact position. We keep a set of plausible positions with confidence values.
-              Blue is prior belief, orange is measurement likelihood, green is fused posterior.
+              Blue is ground-truth pose (teaching reference), gray is prior belief, orange is measurement likelihood,
+              and green is fused posterior belief.
             </p>
             <p>
               The map below now uses a nonlinear range-bearing measurement model around one known landmark.
               Orange shows where the robot could be according to that measurement (an annular sector),
-              blue is the prior pose belief, and green is the fused posterior.
+              blue is ground truth, gray is prior belief, and green is the fused posterior.
             </p>
-            <div class="equation-block">
+            <div class="equation-block" data-eq-viz="bayes-product">
               \[
               p(\mathbf{x}\mid z,m) \propto p(z\mid \mathbf{x},m)\,p(\mathbf{x})
               \]
@@ -257,7 +348,7 @@
             <p>
               with likelihood
             </p>
-            <div class="equation-block">
+            <div class="equation-block" data-eq-viz="range-bearing">
               \[
               p(z\mid \mathbf{x},m)\propto
               \exp\!\left(
@@ -275,7 +366,7 @@
             <div class="guide-block">
               <p class="guide-title">Try This In The Figure</p>
               <ul class="guide-list">
-                <li>Drag the landmark and orange mode point to move measurement geometry.</li>
+                <li>Drag the blue truth pose and landmark to move measurement geometry.</li>
                 <li>Increase range/angle uncertainty handles and watch green posterior spread out.</li>
                 <li>Tighten uncertainty and watch posterior collapse toward a smaller region.</li>
               </ul>
@@ -287,7 +378,7 @@
             <canvas id="bayesCanvas" width="960" height="520"></canvas>
             <div class="controls">
               <p class="control-help">
-                Blue controls prior belief. Orange controls measurement model. Green updates automatically as fused belief.
+                Blue controls truth pose. Gray controls prior belief. Orange controls measurement model. Green is fused belief.
               </p>
               <div class="button-row">
                 <button id="bayesReset" class="secondary">Reset</button>
@@ -300,12 +391,12 @@
       <section class="story" id="correction-story">
         <div class="story-grid">
           <div class="story-copy">
-            <p class="chapter-number">Section 4</p>
+            <p class="chapter-number">Section 5</p>
             <h2>Measurement Update with Known Landmarks</h2>
             <p>
               Here we assume landmark positions are known. The robot predicts motion, then corrects pose using landmark observations.
             </p>
-            <div class="equation-block">
+            <div class="equation-block" data-eq-viz="correction-gain">
               \[
               \begin{aligned}
               \hat{x}_k^- &= f(\hat{x}_{k-1}, u_k) \\
@@ -313,6 +404,12 @@
               \end{aligned}
               \]
             </div>
+            <p>
+              In EKF, \(K_k\) is computed from Jacobians:
+              \(F_k=\frac{\partial f}{\partial x}\), \(H_k=\frac{\partial h}{\partial x}\),
+              and noise covariances \(Q_k, R_k\). The key idea remains geometric:
+              use measurements to pull the predicted pose toward sensor-consistent locations.
+            </p>
             <p>
               Geometrically, landmark measurements pull the drifting estimate back toward plausible positions.
             </p>
@@ -363,7 +460,7 @@
       <section class="story" id="association-story">
         <div class="story-grid">
           <div class="story-copy">
-            <p class="chapter-number">Section 5</p>
+            <p class="chapter-number">Section 6</p>
             <h2>Data Association: Matching Measurements to Landmarks</h2>
             <p>
               A sensor reading is only useful if you attach it to the correct landmark.
@@ -373,12 +470,17 @@
               This figure samples noisy readings from one true landmark and asks:
               which candidate landmark best explains this reading?
             </p>
-            <div class="equation-block">
+            <div class="equation-block" data-eq-viz="association-score">
               \[
               p(z\mid \ell_i) \propto \exp\left(-\frac{1}{2}\Big[\big(\tfrac{\Delta r_i}{\sigma_r}\big)^2 +
               \big(\tfrac{\Delta \phi_i}{\sigma_\phi}\big)^2\Big]\right)
               \]
             </div>
+            <p>
+              Practical systems add <em>gating</em> (reject unlikely matches), and often compare several hypotheses
+              (nearest-neighbor, JCBB, or probabilistic assignment). This section shows the core likelihood mechanism
+              behind those methods.
+            </p>
             <div class="note-block">
               <strong>Failure mode.</strong> Wrong associations can corrupt both map and trajectory even when other components are correct.
             </div>
@@ -417,20 +519,46 @@
       <section class="story" id="slam-story">
         <div class="story-grid">
           <div class="story-copy">
-            <p class="chapter-number">Section 6</p>
+            <p class="chapter-number">Section 7</p>
             <h2>Online SLAM: Estimating Pose and Map Together</h2>
             <p>
               This is the full coupled problem: estimate robot pose and map landmarks at the same time.
               Better pose gives better map updates, and a better map gives better pose corrections.
             </p>
-            <div class="equation-block">
+            <div class="equation-block" data-eq-viz="joint-state">
               \[
               p(x_{0:k}, m \mid z_{1:k}, u_{1:k})
+              \]
+            </div>
+            <div class="equation-block" data-eq-viz="block-covariance">
+              \[
+              \mathbf{y}_k=
+              \begin{bmatrix}
+              \mathbf{x}_k\\
+              \mathbf{m}_1\\
+              \vdots\\
+              \mathbf{m}_N
+              \end{bmatrix}, \qquad
+              P_k=
+              \begin{bmatrix}
+              P_{xx} & P_{xm}\\
+              P_{mx} & P_{mm}
+              \end{bmatrix}
+              \]
+            </div>
+            <div class="equation-block" data-eq-viz="factor-graph">
+              \[
+              p(x_{0:k},m \mid z_{1:k},u_{1:k}) \propto
+              p(m)\,p(x_0)\,\prod_{t=1}^k p(x_t\mid x_{t-1},u_t)\,\prod_{t=1}^k p(z_t\mid x_t,m)
               \]
             </div>
             <p>
               This joint posterior (trajectory \(x_{0:k}\) and map \(m\)) is the central SLAM object.
               The visualization uses a simplified online variant with landmark refinement and loop-closure-like corrections.
+            </p>
+            <p>
+              The off-diagonal covariance blocks (\(P_{xm}, P_{mx}\)) encode robot-map correlations.
+              Those correlations are why observing one landmark can improve many related estimates.
             </p>
             <div class="note-block">
               <strong>Modeling simplification.</strong> This teaching demo assumes known landmark identities after
@@ -485,16 +613,82 @@
         </div>
       </section>
 
+      <section class="story" id="posegraph-story">
+        <div class="story-grid">
+          <div class="story-copy">
+            <p class="chapter-number">Section 8</p>
+            <h2>Pose Graphs and Loop Closure Optimization</h2>
+            <p>
+              Another major SLAM formulation is graph-based SLAM.
+              Each robot pose is a node. Each odometry or sensor relation is an edge (constraint).
+              Loop closure adds a long-range edge that says:
+              "this late pose should be consistent with an earlier place."
+            </p>
+            <div class="equation-block" data-eq-viz="pose-graph-cost">
+              \[
+              \mathbf{x}^\star = \arg\min_{\mathbf{x}}
+              \sum_{(i,j)\in\mathcal{E}}
+              \left\|
+              \mathbf{e}_{ij}(\mathbf{x}_i,\mathbf{x}_j) - \hat{\mathbf{z}}_{ij}
+              \right\|_{\Omega_{ij}}^2
+              \]
+            </div>
+            <p>
+              The objective above says: find all poses \(\mathbf{x}\) that best satisfy all constraints
+              (weighted by information matrix \(\Omega_{ij}\)).
+              In practice this is solved iteratively (Gauss-Newton, Levenberg-Marquardt, iSAM variants).
+            </p>
+            <div class="guide-block">
+              <p class="guide-title">Try This In The Figure</p>
+              <ul class="guide-list">
+                <li>Start optimization and watch green trajectory globally deform to satisfy closure.</li>
+                <li>Increase loop-closure weight to enforce stronger global consistency.</li>
+                <li>Use single-step mode to see optimization as many tiny corrections, not one jump.</li>
+              </ul>
+            </div>
+            <div class="readout" id="poseGraphReadout"></div>
+          </div>
+
+          <div class="viz-panel">
+            <canvas id="poseGraphCanvas" width="960" height="560"></canvas>
+            <div class="controls">
+              <label>
+                Loop-closure weight
+                <input id="pgLoopWeight" type="range" min="0" max="1" step="0.01" value="0.55" />
+                <span id="pgLoopWeightValue">0.55</span>
+              </label>
+              <label>
+                Optimization rate
+                <input id="pgRate" type="range" min="0.05" max="0.5" step="0.01" value="0.26" />
+                <span id="pgRateValue">0.26</span>
+              </label>
+              <label class="checkbox">
+                <input id="pgShowTruth" type="checkbox" checked />
+                Show hidden ground-truth trajectory
+              </label>
+              <div class="button-row">
+                <button id="pgPlayPause">Play</button>
+                <button id="pgStep">Step</button>
+                <button id="pgReset" class="secondary">Reset</button>
+              </div>
+              <p class="control-help">
+                Gray dashed path = raw odometry chain, green = optimized estimate, orange dashed edge = loop-closure constraint.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="story" id="occupancy-story">
         <div class="story-grid">
           <div class="story-copy">
-            <p class="chapter-number">Section 7</p>
+            <p class="chapter-number">Section 9</p>
             <h2>Occupancy Grid Mapping from Range Beams</h2>
             <p>
               Not all SLAM maps are sparse landmarks. A common alternative is occupancy grids, where each cell stores
               probability of being occupied. Range beams update free space along the ray and occupied space at the hit.
             </p>
-            <div class="equation-block">
+            <div class="equation-block" data-eq-viz="logodds-update">
               \[
               L_t(c) = L_{t-1}(c) +
               \begin{cases}
@@ -503,10 +697,11 @@
               \end{cases}
               \]
             </div>
-            <div class="equation-block">
+            <div class="equation-block" data-eq-viz="logistic-frontier">
               \[
               p_t(c)=\sigma(L_t(c))=\frac{1}{1+e^{-L_t(c)}}, \qquad
-              \mathcal{F}=\{c:\,L_t(c)\lt L_{free}\ \land\ \exists n\in\mathcal{N}(c)\text{ with }|L_t(n)|\lt\tau_{unk}\}
+              \mathcal{F}_t=\left\{c\;\middle|\; L_t(c)\lt L_{\mathrm{free}},\;
+              \exists n\in\mathcal{N}(c):\left|L_t(n)\right|\lt\tau_{\mathrm{unk}}\right\}
               \]
             </div>
             <p>
@@ -559,13 +754,13 @@
       <section class="story" id="kinematic-story">
         <div class="story-grid">
           <div class="story-copy">
-            <p class="chapter-number">Section 8</p>
+            <p class="chapter-number">Section 10</p>
             <h2>Kinematic Constraints: Preventing Non-Physical Pose Jumps</h2>
             <p>
               Real robots cannot teleport or spin infinitely fast. So even during correction, state updates should
               obey motion limits.
             </p>
-            <div class="equation-block">
+            <div class="equation-block" data-eq-viz="kinematic-bounds">
               \[
               \dot{x}=v\cos\theta,\quad \dot{y}=v\sin\theta,\quad \dot{\theta}=\omega,\quad
               |\omega|\le \omega_{\max},\; |\dot{v}|\le a_{\max}
@@ -629,12 +824,39 @@
           </div>
         </div>
       </section>
+
+      <section class="story" id="next-steps">
+        <div class="story-grid">
+          <div class="story-copy">
+            <p class="chapter-number">Closing Notes</p>
+            <h2>What You Learned, and What Production SLAM Adds</h2>
+            <p>
+              You now saw the full SLAM stack from first principles: state representation, motion prediction,
+              Bayesian fusion, data association, map updates, loop closure, and physical motion constraints.
+            </p>
+            <div class="guide-block">
+              <p class="guide-title">Key Ideas To Keep</p>
+              <ul class="guide-list">
+                <li>SLAM is a probabilistic inference problem, not just geometry.</li>
+                <li>Most failures come from a mismatch between uncertainty and model assumptions.</li>
+                <li>Loop closure and consistent data association are critical for long-term accuracy.</li>
+                <li>Good motion models prevent impossible corrections that break physical plausibility.</li>
+              </ul>
+            </div>
+            <div class="note-block">
+              <strong>Beyond this chapter.</strong> Production systems add robust outlier rejection,
+              richer sensor models (LiDAR scan matching, visual features, IMU preintegration),
+              sparse linear solvers, and careful real-time systems engineering.
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
 
     <footer>
       <p>
-        These visualizations are pedagogical simplifications of EKF-SLAM, particle-filter SLAM, and graph-based SLAM.
-        They are designed for conceptual understanding rather than production-grade estimation.
+        These visualizations are pedagogical simplifications of EKF-SLAM, graph-SLAM, and occupancy-grid mapping.
+        They are designed for conceptual understanding and mathematical intuition rather than production-grade estimation.
       </p>
     </footer>
 

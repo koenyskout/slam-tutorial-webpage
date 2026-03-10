@@ -162,6 +162,39 @@ h2 {
   overflow-x: auto;
 }
 
+.equation-intuition {
+  margin: 0.55rem 0 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fbfdff;
+  padding: 0.52rem 0.6rem 0.58rem;
+  overflow: hidden;
+}
+
+.equation-intuition-title {
+  margin: 0 0 0.34rem;
+  color: #32495d;
+  font: 600 0.8rem/1.35 "IBM Plex Sans", "Avenir Next", sans-serif;
+}
+
+.equation-intuition-canvas {
+  width: 100%;
+  max-width: 100%;
+  height: clamp(132px, 24vw, 184px);
+  display: block;
+  border: 1px solid #d4dee7;
+  border-radius: 6px;
+  background: #fafdff;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.equation-intuition-hint {
+  margin: 0.35rem 0 0;
+  color: #506678;
+  font: 0.76rem/1.38 "IBM Plex Sans", "Avenir Next", sans-serif;
+}
+
 .note-block {
   margin-top: 0.85rem;
   border-left: 2px solid var(--line-strong);
@@ -194,8 +227,11 @@ h2 {
 canvas {
   width: 100%;
   display: block;
-  border-bottom: 1px solid var(--line);
   background: #fdfefe;
+}
+
+canvas:not(.equation-intuition-canvas) {
+  border-bottom: 1px solid var(--line);
 }
 
 .canvas-play-overlay {
