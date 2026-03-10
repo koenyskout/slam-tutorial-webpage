@@ -138,11 +138,62 @@
               </label>
               <label class="checkbox">
                 <input id="slamShowTruth" type="checkbox" />
-                Show hidden ground-truth landmarks
+                Show hidden ground-truth landmarks and path
               </label>
               <div class="button-row">
                 <button id="slamPlayPause">Pause</button>
                 <button id="slamReset" class="secondary">Reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="story" id="kinematic-story">
+        <div class="story-grid">
+          <div class="story-copy">
+            <h2>4. Kinematic SLAM: Motion Constraints Remove Jumps</h2>
+            <p>
+              Directly applying SLAM corrections to position can create visible pose jumps. Real vehicles cannot
+              teleport: they obey acceleration and turn-rate limits.
+            </p>
+            <p>
+              This demo compares an unconstrained estimate (dashed gray) to a kinematic estimate (green) with
+              bounded acceleration and yaw-rate. The constrained track moves smoothly, even when corrections are noisy.
+            </p>
+            <div class="readout" id="kinematicReadout"></div>
+          </div>
+
+          <div class="viz-panel">
+            <canvas id="kinematicCanvas" width="960" height="560"></canvas>
+            <div class="controls">
+              <label>
+                Odometry noise
+                <input id="kinOdomNoise" type="range" min="0" max="2.5" step="0.05" value="1.2" />
+                <span id="kinOdomNoiseValue">1.20</span>
+              </label>
+              <label>
+                Sensor noise
+                <input id="kinSensorNoise" type="range" min="0" max="2.5" step="0.05" value="0.85" />
+                <span id="kinSensorNoiseValue">0.85</span>
+              </label>
+              <label>
+                Correction gain
+                <input id="kinGain" type="range" min="0" max="1" step="0.02" value="0.36" />
+                <span id="kinGainValue">0.36</span>
+              </label>
+              <label>
+                Max yaw-rate
+                <input id="kinYawRate" type="range" min="0.6" max="3" step="0.05" value="1.7" />
+                <span id="kinYawRateValue">1.70 rad/s</span>
+              </label>
+              <label class="checkbox">
+                <input id="kinShowRaw" type="checkbox" checked />
+                Show unconstrained baseline
+              </label>
+              <div class="button-row">
+                <button id="kinPlayPause">Pause</button>
+                <button id="kinReset" class="secondary">Reset</button>
               </div>
             </div>
           </div>

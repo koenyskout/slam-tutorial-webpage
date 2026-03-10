@@ -158,6 +158,11 @@ canvas {
   align-items: center;
 }
 
+.controls .button-row,
+.controls .checkbox {
+  grid-column: 1 / -1;
+}
+
 button {
   appearance: none;
   border: 1px solid #c3ced8;
