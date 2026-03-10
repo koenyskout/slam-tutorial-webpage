@@ -89,31 +89,9 @@
           <div class="viz-panel">
             <canvas id="framesCanvas" width="960" height="560"></canvas>
             <div class="controls">
-              <label>
-                Robot x
-                <input id="frameX" type="range" min="5" max="95" step="0.5" value="45" />
-                <span id="frameXValue">45.0</span>
-              </label>
-              <label>
-                Robot y
-                <input id="frameY" type="range" min="5" max="95" step="0.5" value="40" />
-                <span id="frameYValue">40.0</span>
-              </label>
-              <label>
-                Heading
-                <input id="frameTheta" type="range" min="-3.14" max="3.14" step="0.01" value="0.8" />
-                <span id="frameThetaValue">0.80 rad</span>
-              </label>
-              <label>
-                Local point x
-                <input id="frameLocalX" type="range" min="-25" max="25" step="0.5" value="12" />
-                <span id="frameLocalXValue">12.0</span>
-              </label>
-              <label>
-                Local point y
-                <input id="frameLocalY" type="range" min="-25" max="25" step="0.5" value="7" />
-                <span id="frameLocalYValue">7.0</span>
-              </label>
+              <p class="control-help">
+                Drag the robot, heading handle, or transformed point directly on the figure.
+              </p>
               <div class="button-row">
                 <button id="frameReset" class="secondary">Reset</button>
               </div>
@@ -202,26 +180,9 @@
           <div class="viz-panel">
             <canvas id="bayesCanvas" width="960" height="520"></canvas>
             <div class="controls">
-              <label>
-                Prior mean
-                <input id="bayesPriorMean" type="range" min="10" max="90" step="0.5" value="45" />
-                <span id="bayesPriorMeanValue">45.0</span>
-              </label>
-              <label>
-                Prior sigma
-                <input id="bayesPriorSigma" type="range" min="2" max="24" step="0.2" value="11" />
-                <span id="bayesPriorSigmaValue">11.0</span>
-              </label>
-              <label>
-                Measurement value
-                <input id="bayesMeasValue" type="range" min="10" max="90" step="0.5" value="62" />
-                <span id="bayesMeasValueValue">62.0</span>
-              </label>
-              <label>
-                Measurement sigma
-                <input id="bayesMeasSigma" type="range" min="2" max="24" step="0.2" value="7" />
-                <span id="bayesMeasSigmaValue">7.0</span>
-              </label>
+              <p class="control-help">
+                Drag the peak markers to move means. Drag sigma handles (small circles on each curve) to change uncertainty.
+              </p>
               <div class="button-row">
                 <button id="bayesReset" class="secondary">Reset</button>
               </div>
@@ -311,16 +272,14 @@
           <div class="viz-panel">
             <canvas id="associationCanvas" width="960" height="560"></canvas>
             <div class="controls">
-              <label>
-                Measurement noise
-                <input id="assocNoise" type="range" min="0.1" max="2.5" step="0.05" value="1" />
-                <span id="assocNoiseValue">1.00</span>
-              </label>
-              <label>
-                Landmark separation
-                <input id="assocSpacing" type="range" min="2" max="18" step="0.5" value="6" />
-                <span id="assocSpacingValue">6.0</span>
-              </label>
+              <p class="control-help">
+                Drag the robot and landmarks to change geometry. Use noise buttons to increase/decrease measurement uncertainty.
+              </p>
+              <div class="button-row">
+                <button id="assocNoiseDown">Noise -</button>
+                <button id="assocNoiseUp">Noise +</button>
+                <span id="assocNoiseValue" class="control-value">1.00</span>
+              </div>
               <div class="button-row">
                 <button id="assocPlayPause">Pause</button>
                 <button id="assocResample">Resample</button>
@@ -501,6 +460,6 @@
       </p>
     </footer>
 
-    <script src="script.js"></script>
+    <script type="module" src="js/main.js"></script>
   </body>
 </html>
