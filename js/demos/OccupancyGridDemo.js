@@ -619,6 +619,7 @@ export class OccupancyGridDemo {
       `Confident cells: ${stats.known}/${this.gridW * this.gridH}\n` +
       `Accuracy on confident cells: ${(stats.accuracy * 100).toFixed(1)}%\n` +
       `Mean map entropy: ${stats.meanEntropy.toFixed(3)} bits\n` +
-      `Collision-avoiding replans: ${this.collisionAvoids}`;
+      `Collision-avoiding replans: ${this.collisionAvoids}\n` +
+      `Interpretation: as scanning continues, gray uncertainty should shrink and frontiers should disappear.`;
   }
 }

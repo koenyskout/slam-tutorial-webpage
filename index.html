@@ -36,15 +36,19 @@
         <p class="eyebrow">Interactive Textbook Chapter</p>
         <h1>Simultaneous Localization and Mapping (SLAM)</h1>
         <p class="lede">
-          This chapter is written for readers with no prior SLAM background. Each section first explains
-          the concept, then gives an interactive visualization where you can change assumptions and observe
-          the consequences directly.
+          This chapter assumes no background in robotics. You only need basic intuition about position,
+          uncertainty, and noisy measurements.
+        </p>
+        <p class="lede">
+          Each section explains one idea in plain language, then asks you to manipulate a visualization so
+          you can see that idea happen, fail, and recover.
         </p>
       </header>
 
       <nav class="textbook-nav" aria-label="Chapter sections">
         <h2>Chapter Outline</h2>
         <ol>
+          <li><a href="#start-here">Start Here: What Problem SLAM Solves</a></li>
           <li><a href="#pipeline-story">The SLAM Recursion: Predict, Correct, Repeat</a></li>
           <li><a href="#frames-story">State, Frames, and Coordinate Transforms</a></li>
           <li><a href="#odometry-story">Prediction from Odometry</a></li>
@@ -57,14 +61,48 @@
         </ol>
       </nav>
 
+      <section class="story" id="start-here">
+        <div class="story-grid">
+          <div class="story-copy">
+            <p class="chapter-number">Start Here</p>
+            <h2>What SLAM Is, Without Robotics Jargon</h2>
+            <p>
+              SLAM means: <strong>build a map while figuring out where you are inside that same map</strong>.
+              That is hard because the robot's motion estimate is noisy, and sensors are noisy too.
+            </p>
+            <p>
+              A useful everyday analogy is walking in a dark building with a weak flashlight and a noisy step counter.
+              You are constantly combining: "How far I think I moved" + "What I think I just saw."
+            </p>
+            <div class="guide-block">
+              <p class="guide-title">How To Use This Chapter</p>
+              <ul class="guide-list">
+                <li>Change one control at a time so cause and effect stay clear.</li>
+                <li>Watch both the picture and the readout; the readout names what changed.</li>
+                <li>When a result looks wrong, pause and drag controls back toward low noise.</li>
+              </ul>
+            </div>
+            <div class="guide-block">
+              <p class="guide-title">What Colors Usually Mean</p>
+              <ul class="guide-list">
+                <li>Blue: reference or hidden truth.</li>
+                <li>Orange/gray: noisy or uncertain intermediate estimates.</li>
+                <li>Green: corrected estimate after fusing information.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="story" id="pipeline-story">
         <div class="story-grid">
           <div class="story-copy">
             <p class="chapter-number">Overview</p>
             <h2>The SLAM Recursion: Predict, Correct, Repeat</h2>
             <p>
-              At each time step, SLAM combines a motion model (prediction) with sensor data (correction).
-              This repeats continuously while the robot moves. The result is a belief over both robot state and map.
+              SLAM runs the same loop many times per second:
+              <strong>predict</strong> where the robot went, then <strong>correct</strong> that prediction with sensor data.
+              Over time, this loop estimates both robot pose and map.
             </p>
             <div class="equation-block">
               \[
@@ -75,8 +113,9 @@
               \]
             </div>
             <p>
-              Sections 1-5 build intuition for each term in this recursion. Sections 6-8 combine them into
-              full online mapping and physically plausible state estimation.
+              If this equation looks heavy, treat it as bookkeeping:
+              \(u_k\) is motion input, \(z_k\) is sensor data, \(x_k\) is pose, and \(m\) is map.
+              Sections 1-5 unpack these pieces one by one. Sections 6-8 put them back together.
             </p>
           </div>
         </div>
@@ -88,12 +127,13 @@
             <p class="chapter-number">Section 1</p>
             <h2>State, Frames, and Coordinate Transforms</h2>
             <p>
-              SLAM begins with a state definition. In 2D, robot pose is typically represented as
-              \(\mathbf{x} = (x, y, \theta)\), where \(x,y\) are position in a world frame and \(\theta\)
-              is heading. Sensors often measure points in the robot's local frame, not in world coordinates.
+              Before mapping, the robot must express everything in one coordinate system.
+              In 2D we write pose as \(\mathbf{x} = (x, y, \theta)\):
+              location \(x,y\), and facing direction \(\theta\).
             </p>
             <p>
-              A local point \((p_x, p_y)\) converts to world coordinates by rigid transform:
+              Sensors usually report points relative to the robot ("2 meters ahead"), not in map coordinates.
+              This equation converts local sensor coordinates into world/map coordinates:
             </p>
             <div class="equation-block">
               \[
@@ -104,8 +144,16 @@
               \]
             </div>
             <p>
-              Move the robot and local point in the figure. This is the geometric core underneath many SLAM measurement models.
+              This transform is the base layer under almost every SLAM measurement update.
             </p>
+            <div class="guide-block">
+              <p class="guide-title">Try This In The Figure</p>
+              <ul class="guide-list">
+                <li>Drag the heading handle while keeping robot position fixed.</li>
+                <li>Then drag the transformed point and watch local coordinates change.</li>
+                <li>Notice how the same physical point can have different coordinates in different frames.</li>
+              </ul>
+            </div>
             <div class="note-block">
               <strong>Why this matters.</strong> Most SLAM errors are ultimately transform or frame-consistency errors.
             </div>
@@ -116,7 +164,7 @@
             <canvas id="framesCanvas" width="960" height="560"></canvas>
             <div class="controls">
               <p class="control-help">
-                Drag the robot, heading handle, or transformed point directly on the figure.
+                Drag robot body, heading handle, or transformed point. The readout updates both local and world coordinates.
               </p>
               <div class="button-row">
                 <button id="frameReset" class="secondary">Reset</button>
@@ -132,8 +180,8 @@
             <p class="chapter-number">Section 2</p>
             <h2>Prediction from Odometry</h2>
             <p>
-              In dead reckoning, pose is updated only from motion increments. If the robot moves by
-              \(\Delta s\) and rotates by \(\Delta\theta\), a common model is:
+              Odometry is "where I think I moved" from wheel encoders or motion sensors.
+              If the robot moves by \(\Delta s\) and turns by \(\Delta \theta\), one common update is:
             </p>
             <div class="equation-block">
               \[
@@ -145,9 +193,17 @@
               \]
             </div>
             <p>
-              Because odometry increments are noisy, drift grows with time and distance. This section shows how fast
-              prediction can diverge without external correction.
+              Even tiny per-step errors accumulate. This is called <em>drift</em>.
+              The visualization shows how pure prediction gradually walks away from truth.
             </p>
+            <div class="guide-block">
+              <p class="guide-title">Try This In The Figure</p>
+              <ul class="guide-list">
+                <li>Set noise low and watch true and odometry paths stay close.</li>
+                <li>Increase noise slowly and observe the gap line between true and odom.</li>
+                <li>Increase speed and notice drift grows faster over distance.</li>
+              </ul>
+            </div>
             <div class="note-block">
               <strong>Core limitation.</strong> Prediction-only localization is unbounded in error over long trajectories.
             </div>
@@ -171,6 +227,9 @@
                 <button id="odomPlayPause">Pause</button>
                 <button id="odomReset" class="secondary">Reset</button>
               </div>
+              <p class="control-help">
+                Read the drift number while moving the noise and speed sliders. This is your first "prediction vs reality" gap.
+              </p>
             </div>
           </div>
         </div>
@@ -182,24 +241,45 @@
             <p class="chapter-number">Section 3</p>
             <h2>Probabilistic Fusion: Prior + Measurement = Posterior</h2>
             <p>
-              SLAM is probabilistic. Instead of one exact pose, we keep a belief distribution. The prior belief from
-              prediction is fused with a measurement likelihood to produce a posterior.
+              In SLAM, we do not keep one exact position. We keep a set of plausible positions with confidence values.
+              Blue is prior belief, orange is measurement likelihood, green is fused posterior.
             </p>
             <p>
-              In 1D Gaussian form, this update has closed-form solution. Let prior be
-              \(\mathcal{N}(\mu_p, \sigma_p^2)\) and measurement be \(\mathcal{N}(z, \sigma_z^2)\). Then:
+              The map below now uses a nonlinear range-bearing measurement model around one known landmark.
+              Orange shows where the robot could be according to that measurement (an annular sector),
+              blue is the prior pose belief, and green is the fused posterior.
             </p>
             <div class="equation-block">
               \[
-              K = \frac{\sigma_p^2}{\sigma_p^2 + \sigma_z^2},\qquad
-              \mu_{post} = \mu_p + K(z - \mu_p),\qquad
-              \sigma_{post}^2 = (1-K)\sigma_p^2
+              p(\mathbf{x}\mid z,m) \propto p(z\mid \mathbf{x},m)\,p(\mathbf{x})
               \]
             </div>
             <p>
-              The posterior is narrower (more certain) than either source if both are informative. This is the
-              algebraic intuition behind Kalman-style SLAM updates.
+              with likelihood
             </p>
+            <div class="equation-block">
+              \[
+              p(z\mid \mathbf{x},m)\propto
+              \exp\!\left(
+                -\frac{1}{2}\left[
+                  \left(\frac{\|\mathbf{x}-\mathbf{\ell}\|-r}{\sigma_r}\right)^2 +
+                  \left(\frac{\mathrm{wrap}(\mathrm{atan2}(y-\ell_y,\;x-\ell_x)-\phi)}{\sigma_\phi}\right)^2
+                \right]
+              \right)
+              \]
+            </div>
+            <p>
+              Lower \(\sigma_r,\sigma_\phi\) makes the orange likelihood narrower, so posterior contracts and shifts
+              more aggressively. Higher uncertainty broadens it, so prior dominates.
+            </p>
+            <div class="guide-block">
+              <p class="guide-title">Try This In The Figure</p>
+              <ul class="guide-list">
+                <li>Drag the landmark and orange mode point to move measurement geometry.</li>
+                <li>Increase range/angle uncertainty handles and watch green posterior spread out.</li>
+                <li>Tighten uncertainty and watch posterior collapse toward a smaller region.</li>
+              </ul>
+            </div>
             <div class="readout" id="bayesReadout"></div>
           </div>
 
@@ -207,7 +287,7 @@
             <canvas id="bayesCanvas" width="960" height="520"></canvas>
             <div class="controls">
               <p class="control-help">
-                Drag the peak markers to move means. Drag sigma handles (small circles on each curve) to change uncertainty.
+                Blue controls prior belief. Orange controls measurement model. Green updates automatically as fused belief.
               </p>
               <div class="button-row">
                 <button id="bayesReset" class="secondary">Reset</button>
@@ -223,7 +303,7 @@
             <p class="chapter-number">Section 4</p>
             <h2>Measurement Update with Known Landmarks</h2>
             <p>
-              Prediction is corrected by comparing actual measurements to expected measurements. In compact notation:
+              Here we assume landmark positions are known. The robot predicts motion, then corrects pose using landmark observations.
             </p>
             <div class="equation-block">
               \[
@@ -234,9 +314,16 @@
               \]
             </div>
             <p>
-              Here landmarks are assumed known. The corrected estimate is continuously pulled back toward geometric
-              consistency with observed landmarks.
+              Geometrically, landmark measurements pull the drifting estimate back toward plausible positions.
             </p>
+            <div class="guide-block">
+              <p class="guide-title">Try This In The Figure</p>
+              <ul class="guide-list">
+                <li>Raise odometry noise and keep sensor noise low.</li>
+                <li>Then increase correction gain and watch corrected path re-align.</li>
+                <li>Set sensor noise high and notice over-correction risk if gain is too large.</li>
+              </ul>
+            </div>
             <div class="note-block">
               <strong>Tuning insight.</strong> Gain trades responsiveness for noise sensitivity.
             </div>
@@ -265,6 +352,9 @@
                 <button id="corrPlayPause">Pause</button>
                 <button id="corrReset" class="secondary">Reset</button>
               </div>
+              <p class="control-help">
+                Practical tuning rule: increase gain until correction helps, then back off when noise causes jitter.
+              </p>
             </div>
           </div>
         </div>
@@ -276,12 +366,12 @@
             <p class="chapter-number">Section 5</p>
             <h2>Data Association: Matching Measurements to Landmarks</h2>
             <p>
-              A measurement is only useful if we know which landmark produced it. This is the
-              <em>data association</em> problem. In cluttered scenes, nearby landmarks can produce ambiguous matches.
+              A sensor reading is only useful if you attach it to the correct landmark.
+              This matching step is called <em>data association</em>.
             </p>
             <p>
-              The simplified figure samples noisy range-bearing measurements from one true landmark, then computes
-              relative likelihood for each candidate landmark. If separation is small and noise is high, wrong matches increase.
+              This figure samples noisy readings from one true landmark and asks:
+              which candidate landmark best explains this reading?
             </p>
             <div class="equation-block">
               \[
@@ -291,6 +381,14 @@
             </div>
             <div class="note-block">
               <strong>Failure mode.</strong> Wrong associations can corrupt both map and trajectory even when other components are correct.
+            </div>
+            <div class="guide-block">
+              <p class="guide-title">Try This In The Figure</p>
+              <ul class="guide-list">
+                <li>Drag landmarks close together so geometry becomes ambiguous.</li>
+                <li>Increase noise and watch wrong-association rate rise.</li>
+                <li>Move landmarks farther apart and see probabilities separate again.</li>
+              </ul>
             </div>
             <div class="readout" id="associationReadout"></div>
           </div>
@@ -322,8 +420,8 @@
             <p class="chapter-number">Section 6</p>
             <h2>Online SLAM: Estimating Pose and Map Together</h2>
             <p>
-              Full SLAM estimates unknown landmarks and robot pose simultaneously. The estimates are coupled:
-              better pose gives better map updates, and better map gives better localization corrections.
+              This is the full coupled problem: estimate robot pose and map landmarks at the same time.
+              Better pose gives better map updates, and a better map gives better pose corrections.
             </p>
             <div class="equation-block">
               \[
@@ -337,6 +435,18 @@
             <div class="note-block">
               <strong>Modeling simplification.</strong> This teaching demo assumes known landmark identities after
               association and uses lightweight correction rules instead of full sparse graph optimization or full EKF covariance propagation.
+            </div>
+            <div class="note-block">
+              <strong>About error numbers.</strong> Pose/map errors shown in the readout are evaluation metrics
+              against hidden simulation truth. Real robots do not have this ground-truth stream online.
+            </div>
+            <div class="guide-block">
+              <p class="guide-title">Try This In The Figure</p>
+              <ul class="guide-list">
+                <li>Start with low noise and observe map points stabilize.</li>
+                <li>Increase odometry noise and watch pose error rise.</li>
+                <li>Increase correction gain to recover, then raise sensor noise to see the trade-off.</li>
+              </ul>
             </div>
             <div class="readout" id="slamReadout"></div>
           </div>
@@ -367,6 +477,9 @@
                 <button id="slamPlayPause">Pause</button>
                 <button id="slamReset" class="secondary">Reset</button>
               </div>
+              <p class="control-help">
+                Use "Show hidden ground truth" to compare estimate quality, then turn it off again to think like a real robot.
+              </p>
             </div>
           </div>
         </div>
@@ -393,14 +506,23 @@
             <div class="equation-block">
               \[
               p_t(c)=\sigma(L_t(c))=\frac{1}{1+e^{-L_t(c)}}, \qquad
-              \mathcal{F}=\{c:\,L_t(c)<L_{free}\ \land\ \exists n\in\mathcal{N}(c)\text{ with }|L_t(n)|<\tau_{unk}\}
+              \mathcal{F}=\{c:\,L_t(c)\lt L_{free}\ \land\ \exists n\in\mathcal{N}(c)\text{ with }|L_t(n)|\lt\tau_{unk}\}
               \]
             </div>
             <p>
-              Left panel: estimated occupancy from noisy beams. Right panel: hidden ground-truth environment.
+              Left panel: estimated occupancy from noisy beams. Right panel: ground-truth environment
+              (hidden from the estimator, shown only for teaching).
               Over time, repeated scans reduce uncertainty and reveal structure. The planner drives toward
               nearest reachable frontier cells (orange markers), then stops when no reachable frontier remains.
             </p>
+            <div class="guide-block">
+              <p class="guide-title">Try This In The Figure</p>
+              <ul class="guide-list">
+                <li>Pause and inspect orange frontier dots: those are boundaries between known free space and unknown space.</li>
+                <li>Increase beam count to make map discovery faster.</li>
+                <li>Increase sensor noise and watch uncertainty remain gray for longer.</li>
+              </ul>
+            </div>
             <div class="readout" id="occupancyReadout"></div>
           </div>
 
@@ -426,6 +548,9 @@
                 <button id="occPlayPause">Pause</button>
                 <button id="occReset" class="secondary">Reset</button>
               </div>
+              <p class="control-help">
+                White means confident free space, dark means confident occupied, light gray means still uncertain.
+              </p>
             </div>
           </div>
         </div>
@@ -437,8 +562,8 @@
             <p class="chapter-number">Section 8</p>
             <h2>Kinematic Constraints: Preventing Non-Physical Pose Jumps</h2>
             <p>
-              If corrections are applied directly to pose, estimates can jump unrealistically. For physical robots,
-              state updates should respect motion constraints.
+              Real robots cannot teleport or spin infinitely fast. So even during correction, state updates should
+              obey motion limits.
             </p>
             <div class="equation-block">
               \[
@@ -448,8 +573,17 @@
             </div>
             <p>
               The green estimate applies bounded yaw-rate and acceleration. The dashed gray baseline applies unconstrained
-              corrections. Compare jump metrics to see why motion priors improve physical plausibility.
+              corrections. Fixed blue landmark dots are ground truth, while green landmark dots/circles are the moving
+              map estimates. Compare jump metrics to see why motion priors improve physical plausibility.
             </p>
+            <div class="guide-block">
+              <p class="guide-title">Try This In The Figure</p>
+              <ul class="guide-list">
+                <li>Enable the raw baseline and compare raw vs kin jump metrics.</li>
+                <li>Reduce max yaw-rate and see motion become smoother but less responsive.</li>
+                <li>Increase correction gain and check whether kin stays close without large jump spikes.</li>
+              </ul>
+            </div>
             <div class="readout" id="kinematicReadout"></div>
           </div>
 
@@ -480,10 +614,17 @@
                 <input id="kinShowRaw" type="checkbox" checked />
                 Show unconstrained baseline
               </label>
+              <label class="checkbox">
+                <input id="kinShowTruth" type="checkbox" checked />
+                Show fixed ground-truth landmarks
+              </label>
               <div class="button-row">
                 <button id="kinPlayPause">Pause</button>
                 <button id="kinReset" class="secondary">Reset</button>
               </div>
+              <p class="control-help">
+                Compare "raw" and "kin" jump values. A good setting keeps kin smooth without letting error grow too much.
+              </p>
             </div>
           </div>
         </div>

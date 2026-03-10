@@ -244,6 +244,6 @@ export class DataAssociationDemo {
       `Selected landmark: ${selectedLm.id} (${this.observation.selected === 0 ? "correct" : "wrong"})\n` +
       `p(L1/L2/L3): ${this.observation.probs.map((p) => p.toFixed(2)).join(" / ")}\n` +
       `Wrong association rate: ${wrongRate.toFixed(1)}% (${this.wrongSamples}/${this.totalSamples})\n` +
-      `Drag robot/landmarks directly. Higher noise or tighter spacing increases ambiguity.`;
+      `Interpretation: close landmarks + high noise = ambiguous matches and more wrong updates.`;
   }
 }

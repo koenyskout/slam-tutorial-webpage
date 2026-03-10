@@ -1,5 +1,6 @@
-import { TAU, THEME } from "../core/constants.js";
-import { clamp, gaussianPdf } from "../core/math.js";
+import { TAU } from "../core/constants.js";
+import { clamp, randn, wrapAngle } from "../core/math.js";
+import { drawGrid, getMapper } from "../core/canvas.js";
 
 export class BayesianUpdateDemo {
   constructor() {
@@ -8,13 +9,16 @@ export class BayesianUpdateDemo {
     this.readout = document.getElementById("bayesReadout");
     this.resetBtn = document.getElementById("bayesReset");
     this.dragMode = null;
+
+    this.cartSamples = this.makeCartesianSamples(900);
+    this.polarSamples = this.makeCartesianSamples(950);
+
     this.bindEvents();
     this.reset();
   }
 
   bindEvents() {
     this.resetBtn.addEventListener("click", () => this.reset());
-
     this.canvas.addEventListener("mousedown", (event) => this.onPointerDown(event));
     window.addEventListener("mousemove", (event) => this.onPointerMove(event));
     window.addEventListener("mouseup", () => {
@@ -22,178 +26,346 @@ export class BayesianUpdateDemo {
     });
   }
 
+  makeCartesianSamples(count) {
+    const out = [];
+    for (let i = 0; i < count; i += 1) {
+      out.push({ gx: randn(), gy: randn() });
+    }
+    return out;
+  }
+
   reset() {
-    this.priorMean = 45;
-    this.priorSigma = 11;
-    this.measMean = 62;
-    this.measSigma = 7;
+    this.prior = { x: 30, y: 35, sigma: 13 };
+    this.landmark = { x: 72, y: 62 };
+    this.measurement = {
+      range: 49,
+      angle: -2.55,
+      sigmaR: 5.8,
+      sigmaA: 0.28,
+    };
     this.draw();
   }
 
-  eventToCanvas(event) {
+  eventToWorld(event, mapper) {
     const rect = this.canvas.getBoundingClientRect();
+    const px = ((event.clientX - rect.left) / rect.width) * this.canvas.width;
+    const py = ((event.clientY - rect.top) / rect.height) * this.canvas.height;
+    return { x: mapper.fromX(px), y: mapper.fromY(py) };
+  }
+
+  measurementModePoint() {
     return {
-      x: ((event.clientX - rect.left) / rect.width) * this.canvas.width,
-      y: ((event.clientY - rect.top) / rect.height) * this.canvas.height,
+      x: this.landmark.x + this.measurement.range * Math.cos(this.measurement.angle),
+      y: this.landmark.y + this.measurement.range * Math.sin(this.measurement.angle),
     };
   }
 
+  getHandles() {
+    const mode = this.measurementModePoint();
+    return [
+      { kind: "priorMean", x: this.prior.x, y: this.prior.y, color: "#2f668e" },
+      { kind: "priorSigma", x: this.prior.x + this.prior.sigma, y: this.prior.y, color: "#2f668e" },
+      { kind: "landmark", x: this.landmark.x, y: this.landmark.y, color: "#3f5568" },
+      { kind: "measMode", x: mode.x, y: mode.y, color: "#a17034" },
+      {
+        kind: "measSigmaR",
+        x: this.landmark.x + (this.measurement.range + this.measurement.sigmaR) * Math.cos(this.measurement.angle),
+        y: this.landmark.y + (this.measurement.range + this.measurement.sigmaR) * Math.sin(this.measurement.angle),
+        color: "#a17034",
+      },
+      {
+        kind: "measSigmaA",
+        x: this.landmark.x + this.measurement.range * Math.cos(this.measurement.angle + this.measurement.sigmaA),
+        y: this.landmark.y + this.measurement.range * Math.sin(this.measurement.angle + this.measurement.sigmaA),
+        color: "#a17034",
+      },
+    ];
+  }
+
   onPointerDown(event) {
-    if (!this.graph) return;
-    const p = this.eventToCanvas(event);
-    const handles = this.getHandles();
-    const radius = 12;
-    for (const handle of handles) {
-      if (Math.hypot(p.x - handle.x, p.y - handle.y) < radius) {
-        this.dragMode = handle.kind;
-        break;
+    const mapper = getMapper(this.canvas);
+    const p = this.eventToWorld(event, mapper);
+    let best = null;
+    let bestDist = Infinity;
+
+    for (const h of this.getHandles()) {
+      const d = Math.hypot(p.x - h.x, p.y - h.y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = h;
       }
+    }
+
+    if (best && bestDist < 3.4) {
+      this.dragMode = best.kind;
     }
   }
 
   onPointerMove(event) {
-    if (!this.dragMode || !this.graph) return;
-    const p = this.eventToCanvas(event);
-    const valueX = clamp(this.graph.pxToX(p.x), 10, 90);
+    if (!this.dragMode) return;
+    const mapper = getMapper(this.canvas);
+    const p = this.eventToWorld(event, mapper);
 
     if (this.dragMode === "priorMean") {
-      this.priorMean = valueX;
-    } else if (this.dragMode === "measMean") {
-      this.measMean = valueX;
-    } else if (this.dragMode === "priorSigma") {
-      this.priorSigma = clamp(Math.abs(valueX - this.priorMean), 2, 24);
-    } else if (this.dragMode === "measSigma") {
-      this.measSigma = clamp(Math.abs(valueX - this.measMean), 2, 24);
+      this.prior.x = clamp(p.x, 6, 94);
+      this.prior.y = clamp(p.y, 6, 94);
+      return;
     }
+
+    if (this.dragMode === "priorSigma") {
+      const d = Math.hypot(p.x - this.prior.x, p.y - this.prior.y);
+      this.prior.sigma = clamp(d, 2, 24);
+      return;
+    }
+
+    if (this.dragMode === "landmark") {
+      this.landmark.x = clamp(p.x, 6, 94);
+      this.landmark.y = clamp(p.y, 6, 94);
+      return;
+    }
+
+    if (this.dragMode === "measMode") {
+      const dx = p.x - this.landmark.x;
+      const dy = p.y - this.landmark.y;
+      this.measurement.range = clamp(Math.hypot(dx, dy), 4, 88);
+      this.measurement.angle = Math.atan2(dy, dx);
+      return;
+    }
+
+    if (this.dragMode === "measSigmaR") {
+      const d = Math.hypot(p.x - this.landmark.x, p.y - this.landmark.y);
+      this.measurement.sigmaR = clamp(Math.abs(d - this.measurement.range), 0.8, 13);
+      return;
+    }
+
+    if (this.dragMode === "measSigmaA") {
+      const a = Math.atan2(p.y - this.landmark.y, p.x - this.landmark.x);
+      this.measurement.sigmaA = clamp(Math.abs(wrapAngle(a - this.measurement.angle)), 0.05, 1.15);
+    }
+  }
+
+  measurementLikelihood(x, y) {
+    const dx = x - this.landmark.x;
+    const dy = y - this.landmark.y;
+    const r = Math.hypot(dx, dy);
+    const a = Math.atan2(dy, dx);
+
+    const dr = (r - this.measurement.range) / this.measurement.sigmaR;
+    const da = wrapAngle(a - this.measurement.angle) / this.measurement.sigmaA;
+    return Math.exp(-0.5 * (dr * dr + da * da));
+  }
+
+  computePosteriorGrid(stepSize) {
+    const cells = [];
+    const priorVar = this.prior.sigma * this.prior.sigma;
+    let maxW = 0;
+    let sumW = 0;
+    let sumX = 0;
+    let sumY = 0;
+    let mapX = this.prior.x;
+    let mapY = this.prior.y;
+
+    for (let y = 0; y <= 100; y += stepSize) {
+      for (let x = 0; x <= 100; x += stepSize) {
+        const dx = x - this.prior.x;
+        const dy = y - this.prior.y;
+        const priorWeight = Math.exp(-0.5 * (dx * dx + dy * dy) / priorVar);
+        const measWeight = this.measurementLikelihood(x, y);
+        const w = priorWeight * measWeight;
+
+        cells.push({ x, y, w });
+        if (w > maxW) {
+          maxW = w;
+          mapX = x;
+          mapY = y;
+        }
+
+        sumW += w;
+        sumX += x * w;
+        sumY += y * w;
+      }
+    }
+
+    const meanX = sumW > 1e-12 ? sumX / sumW : this.prior.x;
+    const meanY = sumW > 1e-12 ? sumY / sumW : this.prior.y;
+
+    let varAcc = 0;
+    for (const c of cells) {
+      const dx = c.x - meanX;
+      const dy = c.y - meanY;
+      varAcc += (dx * dx + dy * dy) * c.w;
+    }
+    const eqSigma = sumW > 1e-12 ? Math.sqrt(varAcc / (2 * sumW)) : this.prior.sigma;
+
+    return {
+      cells,
+      maxW,
+      meanX,
+      meanY,
+      eqSigma,
+      mapX,
+      mapY,
+      sumW,
+    };
+  }
+
+  drawPriorCloud(mapper) {
+    this.ctx.fillStyle = "rgba(47, 102, 142, 0.2)";
+    for (const s of this.cartSamples) {
+      const x = this.prior.x + s.gx * this.prior.sigma;
+      const y = this.prior.y + s.gy * this.prior.sigma;
+      if (x < 0 || x > 100 || y < 0 || y > 100) continue;
+      this.ctx.fillRect(mapper.toX(x) - 1, mapper.toY(y) - 1, 2, 2);
+    }
+  }
+
+  drawMeasurementCloud(mapper) {
+    this.ctx.fillStyle = "rgba(161, 112, 52, 0.2)";
+    for (const s of this.polarSamples) {
+      const r = this.measurement.range + s.gx * this.measurement.sigmaR;
+      if (r < 0.5) continue;
+      const a = this.measurement.angle + s.gy * this.measurement.sigmaA;
+      const x = this.landmark.x + r * Math.cos(a);
+      const y = this.landmark.y + r * Math.sin(a);
+      if (x < 0 || x > 100 || y < 0 || y > 100) continue;
+      this.ctx.fillRect(mapper.toX(x) - 1, mapper.toY(y) - 1, 2, 2);
+    }
+  }
+
+  drawMeasurementGeometry(mapper) {
+    const r = this.measurement.range;
+    const sr = this.measurement.sigmaR;
+    const sa = this.measurement.sigmaA;
+    const inner = Math.max(0.8, r - sr);
+    const outer = r + sr;
+    const a0 = this.measurement.angle - sa;
+    const a1 = this.measurement.angle + sa;
+
+    this.ctx.fillStyle = "rgba(161, 112, 52, 0.13)";
+    this.ctx.beginPath();
+    this.ctx.arc(mapper.toX(this.landmark.x), mapper.toY(this.landmark.y), outer * mapper.scale, -a1, -a0, false);
+    this.ctx.arc(mapper.toX(this.landmark.x), mapper.toY(this.landmark.y), inner * mapper.scale, -a0, -a1, true);
+    this.ctx.closePath();
+    this.ctx.fill();
+
+    this.ctx.strokeStyle = "rgba(161, 112, 52, 0.58)";
+    this.ctx.lineWidth = 1.2;
+    this.ctx.setLineDash([6, 4]);
+    this.ctx.beginPath();
+    this.ctx.arc(mapper.toX(this.landmark.x), mapper.toY(this.landmark.y), r * mapper.scale, 0, TAU);
+    this.ctx.stroke();
+    this.ctx.setLineDash([]);
+
+    const rayLength = r + sr * 1.6;
+    this.ctx.strokeStyle = "rgba(161, 112, 52, 0.7)";
+    this.ctx.beginPath();
+    this.ctx.moveTo(mapper.toX(this.landmark.x), mapper.toY(this.landmark.y));
+    this.ctx.lineTo(
+      mapper.toX(this.landmark.x + rayLength * Math.cos(this.measurement.angle - sa)),
+      mapper.toY(this.landmark.y + rayLength * Math.sin(this.measurement.angle - sa)),
+    );
+    this.ctx.moveTo(mapper.toX(this.landmark.x), mapper.toY(this.landmark.y));
+    this.ctx.lineTo(
+      mapper.toX(this.landmark.x + rayLength * Math.cos(this.measurement.angle + sa)),
+      mapper.toY(this.landmark.y + rayLength * Math.sin(this.measurement.angle + sa)),
+    );
+    this.ctx.stroke();
+  }
+
+  drawPosteriorHeatmap(mapper, posterior, stepSize) {
+    if (posterior.maxW <= 1e-12) return;
+    const cellPx = Math.max(3, stepSize * mapper.scale + 0.2);
+
+    for (const c of posterior.cells) {
+      const n = c.w / posterior.maxW;
+      if (n < 0.035) continue;
+      const alpha = 0.02 + Math.pow(n, 0.62) * 0.48;
+      this.ctx.fillStyle = `rgba(45, 131, 119, ${alpha.toFixed(3)})`;
+      this.ctx.fillRect(mapper.toX(c.x) - cellPx * 0.5, mapper.toY(c.y) - cellPx * 0.5, cellPx, cellPx);
+    }
+  }
+
+  drawCenter(mapper, point, color, label) {
+    const px = mapper.toX(point.x);
+    const py = mapper.toY(point.y);
+    this.ctx.fillStyle = color;
+    this.ctx.beginPath();
+    this.ctx.arc(px, py, 4.8, 0, TAU);
+    this.ctx.fill();
+
+    this.ctx.fillStyle = color;
+    this.ctx.font = "12px IBM Plex Mono";
+    this.ctx.fillText(label, px + 7, py - 7);
+  }
+
+  drawHandles(mapper) {
+    for (const h of this.getHandles()) {
+      this.ctx.fillStyle = h.color;
+      this.ctx.beginPath();
+      this.ctx.arc(mapper.toX(h.x), mapper.toY(h.y), 3.8, 0, TAU);
+      this.ctx.fill();
+    }
+  }
+
+  drawLegend(mapper) {
+    const x = mapper.toX(2);
+    const y = mapper.toY(98);
+    this.ctx.font = "12px IBM Plex Mono";
+
+    this.ctx.fillStyle = "#2f668e";
+    this.ctx.fillText("Prior belief (blue)", x, y);
+    this.ctx.fillStyle = "#a17034";
+    this.ctx.fillText("Range-bearing likelihood (orange)", x, y + 16);
+    this.ctx.fillStyle = "#2d8377";
+    this.ctx.fillText("Posterior belief (green)", x, y + 32);
   }
 
   step() {
     this.draw();
   }
 
-  drawCurve(xToPx, yToPx, mean, sigma, color) {
-    this.ctx.strokeStyle = color;
-    this.ctx.lineWidth = 2.2;
-    this.ctx.beginPath();
-    for (let x = 0; x <= 100; x += 0.5) {
-      const y = gaussianPdf(x, mean, sigma);
-      const px = xToPx(x);
-      const py = yToPx(y);
-      if (x === 0) this.ctx.moveTo(px, py);
-      else this.ctx.lineTo(px, py);
-    }
-    this.ctx.stroke();
-  }
-
   draw() {
-    const ctx = this.ctx;
-    const canvas = this.canvas;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const mapper = getMapper(this.canvas);
+    drawGrid(this.ctx, this.canvas, mapper);
 
-    const priorMean = this.priorMean;
-    const priorSigma = this.priorSigma;
-    const measValue = this.measMean;
-    const measSigma = this.measSigma;
+    const stepSize = 3;
+    const posterior = this.computePosteriorGrid(stepSize);
+    const mode = this.measurementModePoint();
 
-    const priorVar = this.priorSigma * this.priorSigma;
-    const measVar = this.measSigma * this.measSigma;
-    const gain = priorVar / (priorVar + measVar);
-    const postMean = priorMean + gain * (measValue - priorMean);
-    const postSigma = Math.sqrt((1 - gain) * priorVar);
+    this.drawPriorCloud(mapper);
+    this.drawMeasurementGeometry(mapper);
+    this.drawMeasurementCloud(mapper);
+    this.drawPosteriorHeatmap(mapper, posterior, stepSize);
 
-    const left = 66;
-    const right = canvas.width - 28;
-    const top = 26;
-    const bottom = canvas.height - 54;
-    const maxPdf =
-      Math.max(
-        gaussianPdf(priorMean, priorMean, priorSigma),
-        gaussianPdf(measValue, measValue, measSigma),
-        gaussianPdf(postMean, postMean, postSigma),
-      ) * 1.15;
+    this.ctx.strokeStyle = "rgba(47,102,142,0.68)";
+    this.ctx.lineWidth = 1.4;
+    this.ctx.beginPath();
+    this.ctx.arc(mapper.toX(this.prior.x), mapper.toY(this.prior.y), this.prior.sigma * mapper.scale, 0, TAU);
+    this.ctx.stroke();
 
-    const xToPx = (x) => left + (x / 100) * (right - left);
-    const yToPx = (y) => bottom - (y / maxPdf) * (bottom - top);
-    const pxToX = (px) => ((px - left) / (right - left)) * 100;
-    this.graph = { left, right, top, bottom, xToPx, yToPx, pxToX, priorMean, priorSigma, measValue, measSigma };
+    this.ctx.strokeStyle = "rgba(45,131,119,0.92)";
+    this.ctx.lineWidth = 2;
+    this.ctx.beginPath();
+    this.ctx.arc(mapper.toX(posterior.meanX), mapper.toY(posterior.meanY), posterior.eqSigma * mapper.scale, 0, TAU);
+    this.ctx.stroke();
 
-    ctx.strokeStyle = "rgba(113,132,148,0.6)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(left, bottom);
-    ctx.lineTo(right, bottom);
-    ctx.stroke();
+    this.drawCenter(mapper, this.landmark, "#3f5568", "landmark");
+    this.drawCenter(mapper, this.prior, "#2f668e", "prior");
+    this.drawCenter(mapper, mode, "#a17034", "meas mode");
+    this.drawCenter(mapper, { x: posterior.meanX, y: posterior.meanY }, "#2d8377", "post");
 
-    for (let x = 0; x <= 100; x += 10) {
-      const px = xToPx(x);
-      ctx.strokeStyle = "rgba(125,145,162,0.2)";
-      ctx.beginPath();
-      ctx.moveTo(px, top);
-      ctx.lineTo(px, bottom);
-      ctx.stroke();
-      ctx.fillStyle = "#4e6475";
-      ctx.font = "11px IBM Plex Mono";
-      ctx.fillText(`${x}`, px - 8, bottom + 16);
-    }
+    this.drawHandles(mapper);
+    this.drawLegend(mapper);
 
-    this.drawCurve(xToPx, yToPx, priorMean, priorSigma, THEME.truePath);
-    this.drawCurve(xToPx, yToPx, measValue, measSigma, THEME.odomPath);
-    this.drawCurve(xToPx, yToPx, postMean, postSigma, THEME.correctedPath);
-
-    for (const handle of this.getHandles()) {
-      ctx.fillStyle = handle.kind.includes("Sigma") ? "#8b5a2a" : "#2f668e";
-      if (handle.kind.startsWith("meas")) ctx.fillStyle = handle.kind.includes("Sigma") ? "#8b5a2a" : "#a17034";
-      ctx.beginPath();
-      ctx.arc(handle.x, handle.y, 4.8, 0, TAU);
-      ctx.fill();
-    }
-
-    ctx.strokeStyle = THEME.correctedPath;
-    ctx.setLineDash([5, 5]);
-    ctx.beginPath();
-    ctx.moveTo(xToPx(postMean), top);
-    ctx.lineTo(xToPx(postMean), bottom);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    ctx.fillStyle = THEME.truePath;
-    ctx.fillText("prior belief", left + 8, top + 16);
-    ctx.fillStyle = THEME.odomPath;
-    ctx.fillText("measurement likelihood", left + 8, top + 33);
-    ctx.fillStyle = THEME.correctedPath;
-    ctx.fillText("posterior belief", left + 8, top + 50);
+    const priorToMode = Math.hypot(mode.x - this.prior.x, mode.y - this.prior.y);
+    const priorToPost = Math.hypot(posterior.meanX - this.prior.x, posterior.meanY - this.prior.y);
+    const effectiveGain = priorToMode > 1e-5 ? priorToPost / priorToMode : 0;
 
     this.readout.textContent =
-      `Kalman gain K: ${gain.toFixed(3)}\n` +
-      `Posterior mean: ${postMean.toFixed(2)}\n` +
-      `Posterior sigma: ${postSigma.toFixed(2)}\n` +
-      `Drag mean and sigma handles directly on the graph.`;
-  }
-
-  getHandles() {
-    const g = this.graph;
-    if (!g) return [];
-    return [
-      {
-        kind: "priorMean",
-        x: g.xToPx(g.priorMean),
-        y: g.yToPx(gaussianPdf(g.priorMean, g.priorMean, g.priorSigma)),
-      },
-      {
-        kind: "priorSigma",
-        x: g.xToPx(g.priorMean + g.priorSigma),
-        y: g.yToPx(gaussianPdf(g.priorMean + g.priorSigma, g.priorMean, g.priorSigma)),
-      },
-      {
-        kind: "measMean",
-        x: g.xToPx(g.measValue),
-        y: g.yToPx(gaussianPdf(g.measValue, g.measValue, g.measSigma)),
-      },
-      {
-        kind: "measSigma",
-        x: g.xToPx(g.measValue + g.measSigma),
-        y: g.yToPx(gaussianPdf(g.measValue + g.measSigma, g.measValue, g.measSigma)),
-      },
-    ];
+      `Posterior mean: (${posterior.meanX.toFixed(2)}, ${posterior.meanY.toFixed(2)})\n` +
+      `Posterior equivalent sigma: ${posterior.eqSigma.toFixed(2)}\n` +
+      `MAP location: (${posterior.mapX.toFixed(1)}, ${posterior.mapY.toFixed(1)})\n` +
+      `Effective shift fraction (prior->measurement): ${effectiveGain.toFixed(3)}\n` +
+      `Green posterior = compromise between blue prior and orange measurement likelihood.`;
   }
 }

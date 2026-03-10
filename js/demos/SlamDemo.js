@@ -251,6 +251,7 @@ export class SlamDemo {
       `Pose error (true vs estimate): ${poseErr.toFixed(2)} units\n` +
       `Mean landmark error: ${meanMapErr.toFixed(2)} units\n` +
       `Loop closures detected: ${this.loopClosures}\n` +
+      `Interpretation: lower pose/map error means the map and trajectory are becoming self-consistent.\n` +
       `Truth overlay: ${showTruth ? "visible" : "hidden"}`;
   }
 }

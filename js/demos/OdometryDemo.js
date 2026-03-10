@@ -125,6 +125,6 @@ export class OdometryDemo {
     this.readout.textContent =
       `Drift: ${this.drift.toFixed(2)} units\n` +
       `Distance traveled: ${this.travel.toFixed(1)} units\n` +
-      `Observation: drift grows even when each step error is tiny.`;
+      `Interpretation: tiny step errors accumulate, so prediction-only position keeps drifting.`;
   }
 }

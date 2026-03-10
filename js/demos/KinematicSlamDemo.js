@@ -18,11 +18,13 @@ export class KinematicSlamDemo {
     this.yawRate = document.getElementById("kinYawRate");
     this.yawRateValue = document.getElementById("kinYawRateValue");
     this.showRaw = document.getElementById("kinShowRaw");
+    this.showTruth = document.getElementById("kinShowTruth");
 
     this.playPause = document.getElementById("kinPlayPause");
     this.resetBtn = document.getElementById("kinReset");
 
     this.trueLandmarks = makeLandmarks(24, 83);
+    this.landmarkById = new Map(this.trueLandmarks.map((lm) => [lm.id, lm]));
     this.running = true;
     this.reset();
     this.bindEvents();
@@ -72,6 +74,8 @@ export class KinematicSlamDemo {
     this.kinJump = 0;
     this.maxRawJump = 0;
     this.maxKinJump = 0;
+    this.rawCorrectionInliers = 0;
+    this.kinCorrectionInliers = 0;
     this.loopClosures = 0;
     this.lastLoopClosureTime = -1e9;
     this.loopClosureCooldown = 6;
@@ -110,6 +114,44 @@ export class KinematicSlamDemo {
     return existing;
   }
 
+  computeLandmarkCorrection(pose, observations) {
+    let dx = 0;
+    let dy = 0;
+    let dtheta = 0;
+    let wSum = 0;
+    let count = 0;
+
+    for (const obs of observations) {
+      const lm = this.landmarkById.get(obs.id);
+      if (!lm) continue;
+
+      const beam = pose.theta + obs.bearing;
+      const candidateX = lm.x - obs.range * Math.cos(beam);
+      const candidateY = lm.y - obs.range * Math.sin(beam);
+      const residualX = candidateX - pose.x;
+      const residualY = candidateY - pose.y;
+
+      const expectedBearing = wrapAngle(Math.atan2(lm.y - pose.y, lm.x - pose.x) - pose.theta);
+      const innovation = wrapAngle(obs.bearing - expectedBearing);
+      if (Math.abs(innovation) > 1.25) continue;
+
+      const w = 1 / Math.max(8, obs.range);
+      dx += residualX * w;
+      dy += residualY * w;
+      dtheta += -innovation * w;
+      wSum += w;
+      count += 1;
+    }
+
+    if (wSum < 1e-9) return { dx: 0, dy: 0, dtheta: 0, count: 0 };
+    return {
+      dx: dx / wSum,
+      dy: dy / wSum,
+      dtheta: dtheta / wSum,
+      count,
+    };
+  }
+
   updateLoopClosureCount(observations) {
     if (observations.length < 3) return;
     if (this.mapKin.size < 8) return;
@@ -131,6 +173,7 @@ export class KinematicSlamDemo {
     const sensorNoise = Number(this.sensorNoise.value);
     const gain = Number(this.gain.value);
     const yawRateLimit = Number(this.yawRate.value);
+    const dtSafe = Math.max(dt, 1e-3);
 
     this.t += dt;
     const prevTrue = this.truePose;
@@ -141,16 +184,18 @@ export class KinematicSlamDemo {
     const prevRaw = { x: this.rawPose.x, y: this.rawPose.y };
     const prevKin = { x: this.kinPose.x, y: this.kinPose.y };
 
-    this.rawPose.theta = wrapAngle(this.rawPose.theta + deltaTheta + randn() * odomNoise * 0.05);
-    const rawStep = deltaS + randn() * odomNoise * 0.5;
+    this.rawPose.theta = wrapAngle(this.rawPose.theta + deltaTheta + randn() * odomNoise * 0.03);
+    const rawStep = deltaS + randn() * odomNoise * 0.28;
     this.rawPose.x += rawStep * Math.cos(this.rawPose.theta);
     this.rawPose.y += rawStep * Math.sin(this.rawPose.theta);
     clampPose(this.rawPose);
 
-    const vMeasured = Math.max(0, deltaS + randn() * odomNoise * 0.5) / Math.max(dt, 1e-3);
-    const omegaMeasured = (deltaTheta + randn() * odomNoise * 0.05) / Math.max(dt, 1e-3);
-    const accelLimit = 20;
-    const yawAccelLimit = 4.3;
+    const trueV = deltaS / dtSafe;
+    const trueOmega = deltaTheta / dtSafe;
+    const vMeasured = Math.max(0, trueV * (1 + randn() * odomNoise * 0.06) + randn() * odomNoise * 0.18);
+    const omegaMeasured = trueOmega + randn() * odomNoise * 0.08;
+    const accelLimit = 12;
+    const yawAccelLimit = 9;
 
     this.kinPose.v += clamp(vMeasured - this.kinPose.v, -accelLimit * dt, accelLimit * dt);
     this.kinPose.omega += clamp(omegaMeasured - this.kinPose.omega, -yawAccelLimit * dt, yawAccelLimit * dt);
@@ -163,50 +208,37 @@ export class KinematicSlamDemo {
     const observations = this.observations(sensorNoise);
     this.visible = observations;
 
-    let kinCorrX = 0;
-    let kinCorrY = 0;
-    let kinCorrTheta = 0;
-    let kinCorrCount = 0;
-
     for (const obs of observations) {
       const rawGlobal = this.rawPose.theta + obs.bearing;
       const rawPred = {
         x: this.rawPose.x + obs.range * Math.cos(rawGlobal),
         y: this.rawPose.y + obs.range * Math.sin(rawGlobal),
       };
-      const rawLm = this.updateMapPoint(this.mapRaw, obs.id, rawPred);
-      if (rawLm.count > 1) {
-        const rx = rawLm.x - rawPred.x;
-        const ry = rawLm.y - rawPred.y;
-        this.rawPose.x += rx * gain * 0.25;
-        this.rawPose.y += ry * gain * 0.25;
-
-        const rawBearing = wrapAngle(Math.atan2(rawLm.y - this.rawPose.y, rawLm.x - this.rawPose.x) - this.rawPose.theta);
-        const rawInnovation = wrapAngle(obs.bearing - rawBearing);
-        this.rawPose.theta = wrapAngle(this.rawPose.theta - rawInnovation * gain * 0.12);
-        clampPose(this.rawPose);
-      }
+      this.updateMapPoint(this.mapRaw, obs.id, rawPred);
 
       const kinGlobal = this.kinPose.theta + obs.bearing;
       const kinPred = {
         x: this.kinPose.x + obs.range * Math.cos(kinGlobal),
         y: this.kinPose.y + obs.range * Math.sin(kinGlobal),
       };
-      const kinLm = this.updateMapPoint(this.mapKin, obs.id, kinPred);
-      if (kinLm.count > 1) {
-        kinCorrX += kinLm.x - kinPred.x;
-        kinCorrY += kinLm.y - kinPred.y;
-
-        const kinBearing = wrapAngle(Math.atan2(kinLm.y - this.kinPose.y, kinLm.x - this.kinPose.x) - this.kinPose.theta);
-        kinCorrTheta += -wrapAngle(obs.bearing - kinBearing);
-        kinCorrCount += 1;
-      }
+      this.updateMapPoint(this.mapKin, obs.id, kinPred);
     }
 
-    if (kinCorrCount > 0) {
-      let adjustX = (kinCorrX / kinCorrCount) * gain * 0.25;
-      let adjustY = (kinCorrY / kinCorrCount) * gain * 0.25;
-      const maxPositionAdjust = 4.2 * dt;
+    const rawCorr = this.computeLandmarkCorrection(this.rawPose, observations);
+    this.rawCorrectionInliers = rawCorr.count;
+    if (rawCorr.count > 0) {
+      this.rawPose.x += rawCorr.dx * gain * 0.48;
+      this.rawPose.y += rawCorr.dy * gain * 0.48;
+      this.rawPose.theta = wrapAngle(this.rawPose.theta + rawCorr.dtheta * gain * 0.62);
+      clampPose(this.rawPose);
+    }
+
+    const kinCorr = this.computeLandmarkCorrection(this.kinPose, observations);
+    this.kinCorrectionInliers = kinCorr.count;
+    if (kinCorr.count > 0) {
+      let adjustX = kinCorr.dx * gain * 0.54;
+      let adjustY = kinCorr.dy * gain * 0.54;
+      const maxPositionAdjust = Math.max(0.05, 16 * dt);
       const adjustMag = Math.hypot(adjustX, adjustY);
       if (adjustMag > maxPositionAdjust) {
         const s = maxPositionAdjust / adjustMag;
@@ -217,8 +249,8 @@ export class KinematicSlamDemo {
       this.kinPose.x += adjustX;
       this.kinPose.y += adjustY;
 
-      const desiredYawAdjust = (kinCorrTheta / kinCorrCount) * gain * 0.15;
-      const maxYawAdjust = yawRateLimit * 0.2 * dt;
+      const desiredYawAdjust = kinCorr.dtheta * gain * 0.72;
+      const maxYawAdjust = Math.max(0.01, yawRateLimit * dt * 0.95);
       this.kinPose.theta = wrapAngle(this.kinPose.theta + clamp(desiredYawAdjust, -maxYawAdjust, maxYawAdjust));
       clampPose(this.kinPose);
     }
@@ -263,6 +295,15 @@ export class KinematicSlamDemo {
     }
   }
 
+  drawTruthLandmarks(mapper) {
+    this.ctx.fillStyle = "rgba(95, 134, 165, 0.48)";
+    for (const lm of this.trueLandmarks) {
+      this.ctx.beginPath();
+      this.ctx.arc(mapper.toX(lm.x), mapper.toY(lm.y), 2.3, 0, Math.PI * 2);
+      this.ctx.fill();
+    }
+  }
+
   drawVisibleHints(mapper) {
     this.ctx.strokeStyle = THEME.ray;
     this.ctx.lineWidth = 1;
@@ -293,6 +334,9 @@ export class KinematicSlamDemo {
     drawGrid(this.ctx, this.canvas, mapper);
 
     drawPath(this.ctx, mapper, this.truePath, THEME.truthHintPath, 1.7);
+    if (this.showTruth && this.showTruth.checked) {
+      this.drawTruthLandmarks(mapper);
+    }
     this.drawMap(mapper);
     this.drawVisibleHints(mapper);
 
@@ -325,10 +369,13 @@ export class KinematicSlamDemo {
 
     this.readout.textContent =
       `Visible landmarks: ${this.visible.length}\n` +
+      `Truth landmarks: ${this.showTruth && this.showTruth.checked ? "shown (fixed)" : "hidden"}\n` +
+      `Correction inliers raw/kin: ${this.rawCorrectionInliers}/${this.kinCorrectionInliers}\n` +
       `Pose error raw/kin: ${rawErr.toFixed(2)} / ${kinErr.toFixed(2)} units\n` +
       `Step jump raw/kin: ${this.rawJump.toFixed(2)} / ${this.kinJump.toFixed(2)} units\n` +
       `Max jump raw/kin: ${this.maxRawJump.toFixed(2)} / ${this.maxKinJump.toFixed(2)} units\n` +
       `Mean landmark error (kin map): ${meanMapErr.toFixed(2)} units\n` +
-      `Loop closures detected: ${this.loopClosures}`;
+      `Loop closures detected: ${this.loopClosures}\n` +
+      `Interpretation: kinematic constraints should reduce jumps while keeping error competitive.`;
   }
 }

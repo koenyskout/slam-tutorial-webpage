@@ -150,6 +150,6 @@ export class FrameTransformDemo {
       `Robot pose: (${rx.toFixed(1)}, ${ry.toFixed(1)}, ${theta.toFixed(2)} rad)\n` +
       `Local point: (${lx.toFixed(1)}, ${ly.toFixed(1)})\n` +
       `World point: (${wx.toFixed(2)}, ${wy.toFixed(2)})\n` +
-      `Drag robot, heading-handle, or transformed point to edit directly.`;
+      `Same point, two coordinate systems: local (robot frame) and world (map frame).`;
   }
 }

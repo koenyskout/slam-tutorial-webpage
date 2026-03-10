@@ -194,6 +194,6 @@ export class CorrectionDemo {
       `Visible landmarks: ${this.visible.length}\n` +
       `Odometry error: ${odomErr.toFixed(2)} units\n` +
       `Corrected error: ${correctedErr.toFixed(2)} units\n` +
-      `Observation: landmarks anchor the estimate against drift.`;
+      `Interpretation: landmark measurements pull the estimate back when odometry drifts.`;
   }
 }
